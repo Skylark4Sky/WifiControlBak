@@ -1,9 +1,9 @@
---- 模块功能：MQTT客户端数据发送处理
--- @author openLuat
--- @module mqtt.mqttOutMsg
--- @license MIT
--- @copyright openLuat
--- @release 2018.03.28
+--- File Name: mqttOutMsg.lua
+-- System Environment: Darwin Johans-Mac-mini 18.2.0 Darwin Kernel Version 18.2.0: Mon Nov 12 20:24:46 PST 2018; root:xnu-4903.231.4~2/RELEASE_X86_64 x86_64
+-- Created Time: 2019-04-28
+-- Author: Johan
+-- E-mail: Johaness@qq.com
+-- Description: 
 
 require "uartTask"
 

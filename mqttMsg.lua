@@ -1,9 +1,10 @@
---- 模块功能：MQTT客户端数据接收处理
--- @author openLuat
--- @module mqtt.mqttInMsg
--- @license MIT
--- @copyright openLuat
--- @release 2018.03.28
+--- File Name: mqttMsg.lua
+-- System Environment: Darwin Johans-Mac-mini 18.2.0 Darwin Kernel Version 18.2.0: Mon Nov 12 20:24:46 PST 2018; root:xnu-4903.231.4~2/RELEASE_X86_64 x86_64
+-- Created Time: 2019-04-28
+-- Author: Johan
+-- E-mail: Johaness@qq.com
+-- Description: 
+
 module(...,package.seeall)
 
 require "utils"

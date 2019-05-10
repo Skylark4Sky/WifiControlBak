@@ -1,9 +1,10 @@
---- 模块功能：串口功能测试(非TASK版，串口帧有自定义的结构)
--- @author openLuat
--- @module uart.testUart
--- @license MIT
--- @copyright openLuat
--- @release 2018.03.27
+--- File Name: uartTask.lua
+-- System Environment: Darwin Johans-Mac-mini 18.2.0 Darwin Kernel Version 18.2.0: Mon Nov 12 20:24:46 PST 2018; root:xnu-4903.231.4~2/RELEASE_X86_64 x86_64
+-- Created Time: 2019-04-28
+-- Author: Johan
+-- E-mail: Johaness@qq.com
+-- Description: 
+
 module(...,package.seeall)
 
 require "utils"

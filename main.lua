@@ -1,3 +1,10 @@
+--- File Name: main.lua
+-- System Environment: Darwin Johans-Mac-mini 18.2.0 Darwin Kernel Version 18.2.0: Mon Nov 12 20:24:46 PST 2018; root:xnu-4903.231.4~2/RELEASE_X86_64 x86_64
+-- Created Time: 2019-04-28
+-- Author: Johan
+-- E-mail: Johaness@qq.com
+-- Description: 
+
 --必须在这个位置定义PROJECT和VERSION变量
 --PROJECT：ascii string类型，可以随便定义，只要不使用,就行
 --VERSION：ascii string类型，如果使用Luat物联云平台固件升级的功能，必须按照"X.X.X"定义，X表示1位数字；否则可随便定义
