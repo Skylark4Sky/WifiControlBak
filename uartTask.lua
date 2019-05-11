@@ -355,7 +355,7 @@ local function writeOk()
 end
 
 local function parseFrame(frame) 
-	log.error("parseFrame","Data:"..frame:toHex(" "))
+--	log.error("parseFrame","Data:"..frame:toHex(" "))
 	if not frame then return end														--没数据返回 
 	--识别数据帧头
 	local Head = string.find(frame,string.char(0xAA))									
@@ -406,10 +406,10 @@ local function sendAckPacket(packet)
 
 	local o = {}
 	o.id = packet.id
-	o.cmd = package.cmd 
+	o.cmd = packet.cmd 
 	o.retry = 3
 	o.raw = raw
-
+	--log.error("sendAckPacket","Data:"..raw:toHex(" "))
 	insertQueue(sendQueue,o,"uartSendQueue_working")
 end
 
@@ -464,7 +464,7 @@ local function sendQueueProc()
 			local packet = table.remove(sendQueue, 1)
 			if packet.retry >= 2 then
 				--log.error("sendQueueProc","PacketID:",packet.id,"CMD:",packet.cmd,"DATA:",packet.data,"RAW:",packet.raw:toHex(" "))
-				log.error("sendQueueProc","PacketID:",packet.id,"CMD:",packet.cmd)
+				--log.error("sendQueueProc","PacketID:",packet.id,"CMD:",packet.cmd)
 			end
 			uart.write(UART_ID,packet.raw)
 		end
