@@ -462,10 +462,10 @@ local function sendQueueProc()
 		sys.waitUntil("uartSendQueue_working", 5000) 
 		if #sendQueue > 0 then
 			local packet = table.remove(sendQueue, 1)
-			if packet.retry >= 2 then
+--			if packet.retry >= 2 then
 				--log.error("sendQueueProc","PacketID:",packet.id,"CMD:",packet.cmd,"DATA:",packet.data,"RAW:",packet.raw:toHex(" "))
 				--log.error("sendQueueProc","PacketID:",packet.id,"CMD:",packet.cmd)
-			end
+--			end
 			uart.write(UART_ID,packet.raw)
 		end
 	end
