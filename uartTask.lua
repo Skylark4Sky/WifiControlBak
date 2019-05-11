@@ -153,11 +153,11 @@ end
 local function createRawData(id,cmd,data,dir) 
 	if not cmd then return false,"" end
 	local rawData = {}
-	local rawData_len = 0
+	local rawData_len = MinDataLen - 2
 
 	if type(data) == "number" then 
 		rawData_len = MinDataLen - 2 + 1;
-	else 
+	elseif type(data) == "string" then 
 		rawData_len = MinDataLen - 2 + string.len(data);
 	end
 
@@ -186,7 +186,7 @@ local function createRawData(id,cmd,data,dir)
 	--数据
 	if type(data) == "number" then 
 		table.insert(rawData,bit.band(data,255))
-	else 
+	elseif type(data) == "string" then 
 		if data and string.len(data) then 
 			local index = 1
 			while index <= string.len(data) do											--分解数据
@@ -399,6 +399,20 @@ local function parseFrame(frame)
 	return 
 end
 
+local function sendAckPacket(packet)
+	if not packet or packet == nil then return end
+	local result,raw = createRawData(packet.id,packet.cmd,nil,0x01)
+	if result == false then return end
+
+	local o = {}
+	o.id = packet.id
+	o.cmd = package.cmd 
+	o.retry = 3
+	o.raw = raw
+
+	insertQueue(sendQueue,o,"uartSendQueue_working")
+end
+
 local function recvQueueProc()
 	while true do	
 		sys.waitUntil("uartRecvQueue_working", 5000) 
@@ -406,6 +420,8 @@ local function recvQueueProc()
 			local packet = parseFrame(table.remove(recvQueue, 1))
 			if packet and packet.dir == 0x00 then 
 				if RecvCallback and RecvCallback ~= nil then
+					--回复请求包ACK
+					sendAckPacket(packet)
 					RecvCallback(packet)
 				end
 			elseif packet and packet.dir == 0x01 then
