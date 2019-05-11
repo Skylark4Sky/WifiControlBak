@@ -83,25 +83,10 @@ local function firmware_update(firmware_path)
 	end
 end
 
-local function getCodeString()
-	local String = nvm.get("sn_code")
-	local index = 1
-	local bytes = {}
-	while index <= string.len(String) do											--分解数据
-		local byte = string.byte(String,index)
-		if byte ~= 0x00 then
-			bytes[index] = string.char(byte)
-		end
-		index = index + 1
-	end
-	return table.concat(bytes)
-end
-
 function uartTransferCb(exec)
 	if not exec or exec == nil then return end
 	if exec.cbfunparam then 
 		local packet = exec.cbfunparam
-		local code = getCodeString() 
 		local id = os.time()
 		local jsonTable =
 		{
@@ -110,7 +95,6 @@ function uartTransferCb(exec)
 			behavior = packet.behavior,
 			data = {
 					req_id = packet.id,
-					code = code,
 					success = exec.result,
 					msg = exec.reason
 				},
