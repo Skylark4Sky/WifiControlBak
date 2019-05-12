@@ -302,7 +302,7 @@ local function getFrame(data)
 	if #frameData > packetLen then 
 		local retString = string.sub(frameData,packetLen + 1,-1)
 	--	log.error("getFrame","retString:"..retString:toHex(" "))
-		return false,retString
+		return true,retString
 	end
 	return true,""
 end
@@ -325,6 +325,7 @@ local function proc(data)
 	while true do
 		result,unproc = getFrame(unproc)
 		if not unproc or unproc == "" or not result then
+--			log.error("proc:over")
 			break
 		end
 	end
@@ -423,6 +424,10 @@ local function recvQueueProc()
 					--回复请求包ACK
 					sendAckPacket(packet)
 					RecvCallback(packet)
+				end
+				
+				if packet.cmd == GISUNLINK_TASK_CONTROL then 
+			--		log.error("recvQueue:"..packet.data:toHex(" "))
 				end
 			elseif packet and packet.dir == 0x01 then
 				log.error("recvQueueProc:","PacketID:"..packet.id)
