@@ -126,7 +126,6 @@ function uartRecvMsg(packet)
 	if packet.cmd == uartTask.GISUNLINK_TASK_CONTROL then 
 		log.error("uartRecvMsg:","PacketID:",packet.id,"DIR:",packet.dir,"CMD:",packet.cmd,"DATA:",packet.data:toHex(" "));
 	else
-
 --		log.error("uartRecvMsg:","PacketID:",packet.id,"DIR:",packet.dir,"CMD:",packet.cmd,"DATA:",packet.data:toHex(" "));
 	end
 end

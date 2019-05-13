@@ -292,11 +292,13 @@ local function getFrame(data)
 	local TAIL = string.find(frame,string.char(0xBB), -1)
 	--找到帧尾 
 	if TAIL and TAIL == packetLen then 
-	--	log.error("getFrame:","insertData:"..#data);
 		insertQueue(recvQueue,frame,"uartRecvQueue_working")
 	else 
-		log.error("getFrame","packetLen:",packetLen,"FrameLen:",#frameData)
-		log.error("getFrame","not find the tail Data:"..frameData:toHex(" "))
+		if not TAIL or TAIL == nil then
+			log.error("getFrame","not find the tail Data","packetLen:",packetLen,"FrameLen:",#frameData)
+		else
+			log.error("getFrame","tail Data:"..TAIL,"packetLen:",packetLen,"FrameLen:",#frameData)
+		end
 	end
 
 	if #frameData > packetLen then 
