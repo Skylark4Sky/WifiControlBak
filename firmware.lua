@@ -21,11 +21,11 @@ local FW_FILE_PATH = "/gisunlink/firmware.bin"
 
 local download = {}
 download.enable = false
-download.updateCb = nil
+download.update_hook = nil
 
-function updateCb(callback)
-	if not callback or callback == nil then return end
-	download.updateCb = callback
+function updateCb(update_hook)
+	if not update_hook or update_hook == nil then return end
+	download.update_hook = update_hook  
 end
 
 function system_start_signal()
@@ -191,19 +191,86 @@ local function download_check(firmware)
 	return false
 end
 
-local function firmware_update(updateCb)
+local function send_firmwareData_to_device(filePath,update_hook)
+	if not filePath or not update_hook then return 0 end
+	if not update_hook.transfer then return 0 end
+
+	local file,err = io.open(filePath,"r")
+	if file then
+		local offset = 0
+		--沟通完成开始发送数据
+		while true do 
+			local data = file:read(256)
+			if data == nil then
+				break	
+			end
+			--发送数据send data	
+			offset = offset + 1
+			if update_hook.transfer(offset,data) == true then
+				update_hook.send_size = update_hook.send_size + #data
+			else 
+				break
+			end
+		end
+		file:close()
+	else
+		log.error("firmware_update","open firmware file error:",err)
+	end
+	log.error("firmware_update","transfer size:"..update_hook.send_size)
+	return update_hook.send_size
+end
+
+local function firmware_update(update_hook)
 	local firmware = nvm.get("firmware")
 	if not firmware or firmware.transfer_over == true then
 		log.error("firmware_update","no think to do")
 	else
-		if updateCb then 
-			updateCb(firmware.path)
+		log.error("firmware_update:","firmware:"..firmware.path," md5:"..firmware.path," size:"..firmware.size)
+		if update_hook and update_hook.query and update_hook.transfer and update_hook.check then 
+			local transfer_over = false
+			local clean_version = false
+			--GISUNLINK_NEED_UPGRADE = 0x00,   GISUNLINK_NO_NEED_UPGRADE = 0x01,    GISUNLINK_DEVICE_TIMEOUT = 0x02
+			local transfer = update_hook.query(firmware);
+
+			if transfer == 0x01 then 
+				clean_version = true;
+				log.error("firmware_update","device no need to update firmware")
+			elseif transfer == 0x02 then
+				log.error("firmware_update:","device is off-line")
+			elseif transfer == 0x00 then
+				update_hook.update = true
+				update_hook.version = firmware.ver
+				update_hook.send_size = 0
+				update_hook.file_size = firmware.size
+				if send_firmwareData_to_device(firmware.path,update_hook) == firmware.size then
+					transfer_over = true
+				end
+			end
+
+			if transfer_over == true then 
+				log.error("firmware_update:","firmware transfer finish")
+				clean_version = update_hook.check();
+				if clean_version == false then
+					log.error("firmware_update:","device check data error!")
+				end
+			else 
+				log.error("firmware_update:","firmware transfer unfinished")
+			end
+
+			if clean_version == true then
+				os.remove(firmware.path)
+				firmware.transfer_over = true
+				nvm.set("firmware",firmware)
+				if transfer_over == true then
+					log.error("firmware_update","device succeed receive data!")
+				end
+			end
 		end
-		os.remove(firmware.path)
-		firmware.transfer_over = true
-		nvm.set("firmware",firmware)
-		log.error("firmware_update","firmware update finish")
 	end
+	update_hook.update = false;
+	update_hook.file_size = 0;
+	update_hook.send_size = 0;
+	update_hook.version = 0;
 end
 
 local function updateFirmware_Proc(update_ctr)
@@ -223,7 +290,7 @@ local function updateFirmware_Proc(update_ctr)
 				end
 			end
 			--检查是否有可升级固件文件
-			firmware_update(update_ctr.updateCb)
+			firmware_update(update_ctr.update_hook)
 		end
 	end
 end

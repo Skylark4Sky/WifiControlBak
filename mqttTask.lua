@@ -86,9 +86,6 @@ function()
 		end
 
 		if socket.isReady() then
-			--每次联网给固件升级部分一个信号
-			firmware.system_start_signal()
-
 			while system.isTimeSyncOk() == false do
 				log.error("system.istimeSyncOk == false")
 				sys.wait(1000);
@@ -108,6 +105,8 @@ function()
 				retryConnectCnt = 0
 				ready = true
 				GprsNetRdy = false
+				--每次连接成功后给固件升级部分一个信号
+				firmware.system_start_signal()
 				--订阅主题
 				if mqttClient:subscribe({["/point_common"]=0, ["/point_switch/"..clientID]=0}) then
 					mqttOutMsg.init()

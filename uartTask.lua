@@ -47,14 +47,12 @@ GISUNLINK_NETWORK_STATUS = 0x05
 GISUNLINK_NETWORK_RESET = 0x06						
 --网络信号强度
 GISUNLINK_NETWORK_RSSI = 0x07				            
---设备固件版本查询
-GISUNLINK_DEV_FW_VER = 0x08					        
 --设置固件升级版本
-GISUNLINK_DEV_FW_INFO = 0x09						    
+GISUNLINK_DEV_FW_INFO = 0x08						    
 --固件数据传输
-GISUNLINK_DEV_FW_TRANS = 0x0A							
+GISUNLINK_DEV_FW_TRANS = 0x09							
 --请求固件升级
-GISUNLINK_DEV_FW_UPGRADE = 0x0B						
+GISUNLINK_DEV_FW_READY = 0x0A						
 --网络数据透传
 GISUNLINK_TASK_CONTROL = 0x0C							
 --发送成功
@@ -87,7 +85,7 @@ function regRecv(cbfun)
 end
 
 local function getBytes(data,len)
-	if not data or string.len(data) < len then return end
+	if not data or #data < len then return end
 	local index = 1
 	local bytes = {}
 
@@ -99,34 +97,34 @@ local function getBytes(data,len)
 end
 
 local function parse_packet_uint8(data) 
-	if not data or string.len(data) < 1 then return end
+	if not data or #data < 1 then return end
 	local bytes = getBytes(data,1)
 	return bytes[1],string.sub(data,2,-1) --当前域长度为1 所以从第2个字节开始返回
 end
 
 local function parse_packet_uint16(data) 
-	if not data or string.len(data) < 2 then return end
+	if not data or #data < 2 then return end
 	local bytes = getBytes(data,2)
 	local value = bytes[1] + bit.lshift(bytes[2],8)
 	return value,string.sub(data,3,-1)  --当前域长度为2 所以从第3个字节开始返回
 end
 
 local function parse_packet_uint32(data) 
-	if not data or string.len(data) < 4 then return end
+	if not data or #data < 4 then return end
 	local bytes = getBytes(data,4)
 	local value = bytes[1] + bit.lshift(bytes[2],8) + bit.lshift(bytes[3],16) + bit.lshift(bytes[4],24)
 	return value,string.sub(data,5,-1) --当前域长度为4 所以从第5个字节开始返回
 end
 
 local function parse_packet_char(data,len) 
-	if not data or string.len(data) < len then return end
+	if not data or #data < len then return end
 	local string = string.sub(data,1,len) 
 	return string,string.sub(data,len + 1,-1)
 end
 
 local function parse_packet_crc(data) 
 	local check_sum = 0;
-	local data_len = string.len(data);
+	local data_len = #data;
 	local index = 1;
 	while index <= data_len do 
 		check_sum = check_sum + string.byte(data,index)
@@ -142,10 +140,9 @@ local function checkPackeeCmd(cmd)
 	if cmd == GISUNLINK_NETWORK_STATUS then return true end 
 	if cmd == GISUNLINK_NETWORK_RESET then return true end 
 	if cmd == GISUNLINK_NETWORK_RSSI then return true end 
-	if cmd == GISUNLINK_DEV_FW_VER then return true end 
 	if cmd == GISUNLINK_DEV_FW_INFO then return true end 
 	if cmd == GISUNLINK_DEV_FW_TRANS then return true end 
-	if cmd == GISUNLINK_DEV_FW_UPGRADE then return true end 
+	if cmd == GISUNLINK_DEV_FW_READY then return true end 
 	if cmd == GISUNLINK_TASK_CONTROL then return true end 
 	return false
 end
@@ -158,7 +155,7 @@ local function createRawData(id,cmd,data,dir)
 	if type(data) == "number" then 
 		rawData_len = MinDataLen - 2 + 1;
 	elseif type(data) == "string" then 
-		rawData_len = MinDataLen - 2 + string.len(data);
+		rawData_len = MinDataLen - 2 + #data;
 	end
 
 	if rawData_len > MaxDataLen then return false,"" end 
@@ -187,9 +184,9 @@ local function createRawData(id,cmd,data,dir)
 	if type(data) == "number" then 
 		table.insert(rawData,bit.band(data,255))
 	elseif type(data) == "string" then 
-		if data and string.len(data) then 
+		if data and #data > 0 then 
 			local index = 1
-			while index <= string.len(data) do											--分解数据
+			while index <= #data do											--分解数据
 				table.insert(rawData,string.byte(data,index))
 				index = index + 1
 			end
@@ -228,7 +225,7 @@ cbfun:回调函数
 ]]
 function sendData(cmd,data,async,cbfun,cbfunparam)
 	local o = {}
-	if not cmd or not data then return end
+	if not cmd then return end
 	packet_id = packet_id + 1;
 	local result,raw = createRawData(packet_id,cmd,data)
 	if result == false then return end
@@ -250,7 +247,7 @@ function sendData(cmd,data,async,cbfun,cbfunparam)
 		--实时等待回复
 		if not cbfun then
 			local waitString = "wait"..o.id
-	--		log.error("sendData","sync wait------------->",waitString)
+			--log.error("sendData","sync wait------------->",waitString)
 			--最大等待5秒
 			local result, data = sys.waitUntil(waitString,5000)
 			if result then 
@@ -262,7 +259,7 @@ function sendData(cmd,data,async,cbfun,cbfunparam)
 				return res
 			end
 		else -- 异步等待回复
-	--		log.error("sendData","async wait------------->")
+			log.error("sendData","async wait------------->")
 			--不处理了
 		end
 	end
@@ -287,6 +284,7 @@ local function getFrame(data)
 	if packetLen > MaxDataLen then return false,"" end
 	--如处理的整包数据大于帧长度 从帧头开始返回
 	if packetLen > #frameData then return false,frameData end
+
 	--检查数据帧尾
 	local frame = string.sub(frameData,Head,packetLen)
 	local TAIL = string.find(frame,string.char(0xBB), -1)
@@ -294,11 +292,8 @@ local function getFrame(data)
 	if TAIL and TAIL == packetLen then 
 		insertQueue(recvQueue,frame,"uartRecvQueue_working")
 	else 
-		if not TAIL or TAIL == nil then
-			log.error("getFrame","not find the tail Data","packetLen:",packetLen,"FrameLen:",#frameData)
-		else
-			log.error("getFrame","tail Data:"..TAIL,"packetLen:",packetLen,"FrameLen:",#frameData)
-		end
+		local retString = string.sub(frameData,Head + 1,-1)
+		return false,retString
 	end
 
 	if #frameData > packetLen then 
@@ -317,7 +312,7 @@ data：当前一次从串口读到的数据
 返回值：无
 ]]
 local function proc(data)
-	if not data or string.len(data) == 0 then return end
+	if not data or #data == 0 then return end
 	--追加到缓冲区
 	rdbuf = rdbuf..data    
 
@@ -348,7 +343,7 @@ local function read()
 	--所以Lua脚本中收到中断读串口数据时，每次都要把接收缓冲区中的数据全部读出，这样才能保证底层core中的新数据中断上来，此read函数中的while语句中就保证了这一点
 	while true do        
 		data = uart.read(UART_ID,"*l",0) --
-		if not data or string.len(data) == 0 then break end
+		if not data or #data == 0 then break end
 		proc(data)
 	end
 end
@@ -395,10 +390,9 @@ local function parseFrame(frame)
 	if packet.crc == calc_crc then 
 		return packet
 	else 
-		log.error("parseUartData:","PacketID:"..packet_id.." crc false")
+		log.error("parseUartData:","PacketCMD:"..packet.cmd.." PacketID:"..packet_id.." crc false")
 		return 
 	end
-
 	return 
 end
 
@@ -432,7 +426,7 @@ local function recvQueueProc()
 			--		log.error("recvQueue:"..packet.data:toHex(" "))
 				end
 			elseif packet and packet.dir == 0x01 then
-				log.error("recvQueueProc:","PacketID:"..packet.id)
+--				log.error("recvQueueProc:","PacketID:"..packet.id)
 				for k, v in ipairs(waitQueue) do 
 					local waitPacket = v
 					if waitPacket.id == packet.id and waitPacket.wb_del == false then
@@ -502,7 +496,7 @@ local function waitQueueOpt(Queue,key,value,hash_del)
 	local packet = value
 	if packet and type(packet) == "table" then 
 		local curTime = os.clock()
-		local diff_value = 200 --实际为0.2 乘1000为了消除工具提示错误
+		local diff_value = 300 --实际为0.2 乘1000为了消除工具提示错误
 		if ((curTime - packet.startTime) * 1000) >= diff_value and packet.wb_del == false then  
 			--如果重试次数未用完则再次发一次数据
 			if packet.retry > 0 then 
