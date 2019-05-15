@@ -388,6 +388,9 @@ local function parseFrame(frame)
 	--计算校验码
 	local calc_crc = parse_packet_crc(string.sub(frame,2,#frame-3))	
 	if packet.crc == calc_crc then 
+		if packet.cmd == GISUNLINK_TASK_CONTROL then  
+			log.error("parseFrame:"..frame:toHex(" "))
+		end
 		return packet
 	else 
 		log.error("parseUartData:","PacketCMD:"..packet.cmd.." PacketID:"..packet_id.." crc false")

@@ -242,7 +242,7 @@ function uartRecvMsg(packet)
 
 			local jsonTable =
 			{
-				id = time..remainder, 
+				id = tonumber(time..remainder), 
 				act = packet.act,
 				behavior = behavior,
 				data = base64str,
