@@ -180,11 +180,12 @@ local function new_firmware_download_proc(update_ctr)
 	end
 end
 
-local function download_check(firmware)
-	if not firmware then 
+local function download_check(last_task)
+	if not last_task then 
 		return true
 	else
-		if firmware.download_over and firmware.download_over == true then
+		if last_task.download_over and last_task.download_over == true then
+			log.error("download_check:"..last_task.ver)
 			return true
 		end
 	end

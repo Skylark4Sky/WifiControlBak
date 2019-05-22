@@ -259,7 +259,7 @@ function sendData(cmd,data,async,cbfun,cbfunparam)
 				return res
 			end
 		else -- 异步等待回复
-			log.error("sendData","async wait------------->")
+			--log.error("sendData","async wait------------->")
 			--不处理了
 		end
 	end
@@ -388,9 +388,9 @@ local function parseFrame(frame)
 	--计算校验码
 	local calc_crc = parse_packet_crc(string.sub(frame,2,#frame-3))	
 	if packet.crc == calc_crc then 
-		if packet.cmd == GISUNLINK_TASK_CONTROL then  
-			log.error("parseFrame:"..frame:toHex(" "))
-		end
+		--if packet.cmd == GISUNLINK_TASK_CONTROL then  
+		--	log.error("parseFrame:"..frame:toHex(" "))
+		--end
 		return packet
 	else 
 		log.error("parseUartData:","PacketCMD:"..packet.cmd.." PacketID:"..packet_id.." crc false")
@@ -417,7 +417,9 @@ local function recvQueueProc()
 	while true do	
 		sys.waitUntil("uartRecvQueue_working", 5000) 
 		if #recvQueue > 0 then
-			local packet = parseFrame(table.remove(recvQueue, 1))
+			local frameData = table.remove(recvQueue, 1)
+			local packet = parseFrame(frameData)
+			--log.error("recvQueueProc:"..frameData:toHex(" "))
 			if packet and packet.dir == 0x00 then 
 				if RecvCallback and RecvCallback ~= nil then
 					--回复请求包ACK
@@ -570,4 +572,5 @@ uart.on(UART_ID,"sent",writeOk)
 --配置并且打开串口
 --uart.setup(UART_ID,9600,8,uart.PAR_NONE,uart.STOP_1)
 --如果需要打开“串口发送数据完成后，通过异步消息通知”的功能，则使用下面的这行setup，注释掉上面的一行setup
-uart.setup(UART_ID,9600,8,uart.PAR_NONE,uart.STOP_1,nil,1)
+--uart.setup(UART_ID,9600,8,uart.PAR_NONE,uart.STOP_1,nil,1)
+uart.setup(UART_ID,115200,8,uart.PAR_NONE,uart.STOP_1,nil,1)

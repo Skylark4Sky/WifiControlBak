@@ -109,7 +109,7 @@ function()
 				firmware.system_start_signal()
 				--订阅主题
 				if mqttClient:subscribe({["/point_common"]=0, ["/point_switch/"..clientID]=0}) then
-					mqttOutMsg.init()
+					--mqttOutMsg.init()
 					--循环处理接收和发送的数据
 					while true do
 						if not mqttInMsg.proc(mqttClient) then log.error("mqttTask.mqttInMsg.proc error") break end

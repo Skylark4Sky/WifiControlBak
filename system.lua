@@ -98,7 +98,7 @@ local function firmware_query(firmware)
 			break
 		else 
 			send_num = send_num + 1
-			log.error("firmware_transfer","send failed reason:"..result.reason,"retry:"..send_num)
+			log.error("firmware_query","send failed reason:"..result.reason,"retry:"..send_num)
 		end
 		if send_num == 5 then
 			break
@@ -175,9 +175,9 @@ function uartTransferCb(exec)
 	if exec.cbfunparam then 
 		local packet = exec.cbfunparam
 		local id = os.time()
-		local successString = "false"
+		local successString = false
 		if exec.send == uartTask.GISUNLINK_SEND_SUCCEED then 
-			successString = "true"
+			successString = true
 		end
 		local jsonTable =
 		{
@@ -206,8 +206,8 @@ function mqttRecvMsg(packet)
 				behavior = packet.behavior,
 				data = {
 					req_id = packet.id,
-					success = "false",
-					msg = "system upgrade! ver:"..update_hook.version.."file_size:"..update_hook.file_size.."progress_size:"..update_hook.send_size
+					success = false,
+					msg = "system upgrade! ver:"..update_hook.version.." file_size:"..update_hook.file_size.." progress_size:"..update_hook.send_size
 				},
 			}
 			mqttMsg.sendMsg("/point_switch_resp",json.encode(jsonTable),0)
@@ -225,6 +225,7 @@ end
 function uartRecvMsg(packet)
 	if not packet or packet == nil then return end
 	local clientID = "gsl_"..misc.getImei()
+	--这里上传stm32发来的透传数据
 	if packet.cmd == uartTask.GISUNLINK_TASK_CONTROL then 
 		local data = packet.data
 		if not data or #data > 0 then
