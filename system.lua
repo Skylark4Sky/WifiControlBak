@@ -174,14 +174,18 @@ function uartTransferCb(exec)
 	if not exec or exec == nil then return end
 	if exec.cbfunparam then 
 		local packet = exec.cbfunparam
-		local id = os.time()
+
+		local time = os.time()
+		local clock = os.clock()
+		local integer,remainder = math.modf(clock);
+		remainder = tonumber(string.format("%.3f", remainder)) * 1000
 		local successString = false
 		if exec.send == uartTask.GISUNLINK_SEND_SUCCEED then 
 			successString = true
 		end
 		local jsonTable =
 		{
-			id = id, 
+			id = tonumber(time..remainder), 
 			act = packet.act,
 			behavior = packet.behavior,
 			data = {
@@ -198,10 +202,13 @@ function mqttRecvMsg(packet)
 	if not packet or packet == nil then return end
 	if packet.act == "transfer" then --正常传输命令
 		if update_hook.update == true then  
-			local id = os.time()
+			local time = os.time()
+			local clock = os.clock()
+			local integer,remainder = math.modf(clock);
+			remainder = tonumber(string.format("%.3f", remainder)) * 1000
 			local jsonTable =
 			{
-				id = id, 
+				id = tonumber(time..remainder), 
 				act = packet.act,
 				behavior = packet.behavior,
 				data = {
