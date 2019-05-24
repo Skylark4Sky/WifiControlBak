@@ -107,6 +107,7 @@ function()
 				GprsNetRdy = false
 				--每次连接成功后给固件升级部分一个信号
 				firmware.system_start_signal()
+				sys.publish("GISUNLINK_NETMANAGER_CONNECTED_SER")
 				--订阅主题
 				if mqttClient:subscribe({["/point_common"]=0, ["/point_switch/"..clientID]=0}) then
 					--mqttOutMsg.init()
@@ -118,18 +119,19 @@ function()
 					end
 					mqttOutMsg.unInit()
 				end
+				sys.publish("GISUNLINK_NETMANAGER_DISCONNECTED_SER")
 				ready = false
 			else
-				retryConnectCnt = retryConnectCnt+1
+				retryConnectCnt = retryConnectCnt + 1
 			end
 			--断开MQTT连接
 			mqttClient:disconnect()
-			if retryConnectCnt>=5 then link.shut() retryConnectCnt=0 end
+			if retryConnectCnt >= 5 then link.shut() retryConnectCnt=0 end
 			sys.wait(5000)
 		else
-			--进入飞行模式，20秒之后，退出飞行模式
+			--进入飞行模式，10秒之后，退出飞行模式
 			net.switchFly(true)
-			sys.wait(20000)
+			sys.wait(10000)
 			net.switchFly(false)
 		end
 	end

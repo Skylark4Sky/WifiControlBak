@@ -16,9 +16,12 @@ require "uartTask"
 require "mqttMsg"
 require "firmware"
 
+local statrsynctime = false
 local timeSyncOk = false
 local isTimeSyncStart = false
 local update_hook = {update = false,version = 0,file_size = 0,send_size = 0}
+
+local NetState = uartTask.GISUNLINK_NETMANAGER_IDLE 
 
 function isTimeSyncOk()
     return timeSyncOk
@@ -27,35 +30,62 @@ end
 function sntpCb()
 	log.warn("System","TimeSync OK");
 	timeSyncOk = true;
+	NetState = uartTask.GISUNLINK_NETMANAGER_TIME_SUCCEED
+	uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
 end
 
 function subNetState()
 	sys.subscribe("NET_STATUS_IND",         
-		function ()
-			log.warn("System","NET_STATUS_IND ---------------> NET_STATUS_IND")
-		end)    
+	function ()
+		log.warn("System","NET_STATUS_IND ---------------> NET_STATUS_IND")
+	end)    
 
 	sys.subscribe("NET_STATE_REGISTERED",         
-		function ()
-			uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,3);
-			--log.warn("System","NET_STATE_REGISTERED ---------------> GSM 网络发生变化 注册成功")
-		end)    
+	function ()
+		NetState = uartTask.GISUNLINK_NETMANAGER_CONNECTED 
+		uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
+		if statrsynctime == false then
+			statrsynctime = true;
+			ntp.setServers({"cn.ntp.org.cn","hk.ntp.org.cn","tw.ntp.org.cn"}) --设置时间同步
+			ntp.timeSync(24,sntpCb)
+		end	
+		--log.warn("System","NET_STATE_REGISTERED ---------------> GSM 网络发生变化 注册成功")
+	end)    
 
 	sys.subscribe("NET_STATE_UNREGISTER",         
-		function ()
-			uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,4);
-			--log.warn("System","NET_STATE_UNREGISTER ---------------> GSM 网络发生变化 未注册成功")
-			--
-		end)    
+	function ()
+		NetState = uartTask.GISUNLINK_NETMANAGER_DISCONNECTED 
+		uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
+		--log.warn("System","NET_STATE_UNREGISTER ---------------> GSM 网络发生变化 未注册成功")
+		--
+	end)    
+
+	sys.subscribe("GISUNLINK_NETMANAGER_CONNECTED_SER",         
+	function ()
+		NetState = uartTask.GISUNLINK_NETMANAGER_CONNECTED_SER 
+		uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
+		--log.warn("System","NET_STATE_UNREGISTER ---------------> 已连上平台")
+		--
+	end)    
+
+	sys.subscribe("GISUNLINK_NETMANAGER_DISCONNECTED_SER",         
+	function ()
+		NetState = uartTask.GISUNLINK_NETMANAGER_DISCONNECTED_SER
+		uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
+		--log.warn("System","NET_STATE_UNREGISTER ---------------> 已断开平台")
+		--
+	end)    
 
 	sys.subscribe("GSM_SIGNAL_REPORT_IND",         
-		function (success, rssi)
-			if rssi == 0 then
-				uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,2);
-			else
-				uartTask.sendData(uartTask.GISUNLINK_NETWORK_RSSI,rssi);
-			end
-		end)    
+	function (success, rssi)
+		if rssi == 0 then
+			NetState = uartTask.GISUNLINK_NETMANAGER_CONNECTING
+			uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
+			--log.warn("System","NET_STATE_UNREGISTER ---------------> 链接网络中")
+		else
+			uartTask.sendData(uartTask.GISUNLINK_NETWORK_RSSI,rssi);
+		end
+	end)    
 end
 
 local function firmware_query(firmware) 
@@ -221,9 +251,17 @@ function mqttRecvMsg(packet)
 			return;
 		end
 		local data = crypto.base64_decode(packet.data,string.len(packet.data))
-		local uartData = string.char(packet.behavior,string.byte(data,1,string.len(data)))
-		log.error("mqttRecvMsg:",uartData:toHex(" "))
-		uartTask.sendData(uartTask.GISUNLINK_TASK_CONTROL,uartData,true,uartTransferCb,packet);
+
+		if not data or #data <= 0 then
+			local exec = {};
+			exec.cbfunparam = packet;
+			exec.send = uartTask.GISUNLINK_SEND_FAILED; 
+			exec.reason = "decode data failed";
+			uartTransferCb(exec);
+		else
+			local uartData = string.char(packet.behavior,string.byte(data,1,string.len(data)))
+			uartTask.sendData(uartTask.GISUNLINK_TASK_CONTROL,uartData,true,uartTransferCb,packet);
+		end
 	elseif packet.act == "update_ver" then --升级命令
 		firmware.download_new_firmware(packet.data)
 	end
@@ -236,7 +274,7 @@ function uartRecvMsg(packet)
 	if packet.cmd == uartTask.GISUNLINK_TASK_CONTROL then 
 		local data = packet.data
 		if not data or #data > 0 then
-			log.error("uartRecvMsg:","data:",data:toHex(" "))
+			--	log.error("uartRecvMsg:","data:",data:toHex(" "))
 			local behavior = string.byte(data,1) 
 			local time = os.time()
 			local clock = os.clock()
@@ -259,18 +297,26 @@ function uartRecvMsg(packet)
 
 			local jsonString = json.encode(jsonTable)
 			local topic = "/power_run/"..clientID
-			log.error("uartRecvMsg:","Topic:"..topic," jsonString:"..jsonString)
+			--log.error("uartRecvMsg:","Topic:"..topic," jsonString:"..jsonString)
 			mqttMsg.sendMsg("/power_run/"..clientID,jsonString,0)
 		end
 	else
-		--		log.error("uartRecvMsg:","PacketID:",packet.id,"DIR:",packet.dir,"CMD:",packet.cmd,"DATA:",packet.data:toHex(" "));
+		if packet.cmd == uartTask.GISUNLINK_NETWORK_STATUS then 
+			uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
+		end
 	end
 end
 
 function system_loop()
 	while true do	
-		if ntp.isEnd() then
-			log.warn("system","rssi:",net.getRssi(),"heap_size:",rtos.get_fs_free_size(),"Time:",os.time());
+		if statrsynctime == true then 
+			if ntp.isEnd() then
+				log.warn("system","rssi:",net.getRssi(),"heap_size:",rtos.get_fs_free_size(),"Time:",os.time());
+			else
+				NetState = uartTask.GISUNLINK_NETMANAGER_TIME_FAILED
+				uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
+				log.warn("system","rssi:",net.getRssi(),"heap_size:",rtos.get_fs_free_size());
+			end
 		else
 			log.warn("system","rssi:",net.getRssi(),"heap_size:",rtos.get_fs_free_size());
 		end
@@ -284,8 +330,6 @@ subNetState() --网络状态
 mqttMsg.regRecv(mqttRecvMsg)
 --注册串口回调	
 uartTask.regRecv(uartRecvMsg)
-ntp.setServers({"cn.ntp.org.cn","hk.ntp.org.cn","tw.ntp.org.cn"}) --设置时间同步
-ntp.timeSync(24,sntpCb)
 
 update_hook.query = firmware_query 
 update_hook.transfer = firmware_transfer
