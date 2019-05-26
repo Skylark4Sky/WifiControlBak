@@ -67,6 +67,10 @@ GISUNLINK_NETMANAGER_TIME_FAILED = 0x0A
 GISUNLINK_NETMANAGER_CONNECTED_SER = 0x0B 
 --已断开平台
 GISUNLINK_NETMANAGER_DISCONNECTED_SER = 0xC  
+--GSM注册网络成功
+GISUNLINK_NETMANAGER_GSM_CONNECTED = 0xd
+--GSM注册网络成功
+GISUNLINK_NETMANAGER_GSM_DISCONNECTED = 0xe
 --未知状态
 GISUNLINK_NETMANAGER_UNKNOWN = 0xD
 --
@@ -82,8 +86,12 @@ GISUNLINK_DEV_FW_INFO = 0x08
 GISUNLINK_DEV_FW_TRANS = 0x09							
 --请求固件升级
 GISUNLINK_DEV_FW_READY = 0x0A						
+--获取SN设备号
+GISUNLINK_DEV_SN = 0x0B
+
 --网络数据透传
 GISUNLINK_TASK_CONTROL = 0x0C							
+
 --发送成功
 GISUNLINK_SEND_SUCCEED = true
 --发送超时
@@ -172,6 +180,7 @@ local function checkPackeeCmd(cmd)
 	if cmd == GISUNLINK_DEV_FW_INFO then return true end 
 	if cmd == GISUNLINK_DEV_FW_TRANS then return true end 
 	if cmd == GISUNLINK_DEV_FW_READY then return true end 
+	if cmd == GISUNLINK_DEV_SN then return true end 
 	if cmd == GISUNLINK_TASK_CONTROL then return true end 
 	return false
 end

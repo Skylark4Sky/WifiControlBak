@@ -15,6 +15,7 @@ require "config"
 require "uartTask"
 require "mqttMsg"
 require "firmware"
+require "mqttTask"
 
 local statrsynctime = false
 local timeSyncOk = false
@@ -42,8 +43,10 @@ function subNetState()
 
 	sys.subscribe("NET_STATE_REGISTERED",         
 	function ()
-		NetState = uartTask.GISUNLINK_NETMANAGER_CONNECTED 
-		uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
+		if mqttTask.isReady() == false then 
+			NetState = uartTask.GISUNLINK_NETMANAGER_GSM_CONNECTED 
+			uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
+		end
 		if statrsynctime == false then
 			statrsynctime = true;
 			ntp.setServers({"cn.ntp.org.cn","hk.ntp.org.cn","tw.ntp.org.cn"}) --设置时间同步
@@ -54,7 +57,7 @@ function subNetState()
 
 	sys.subscribe("NET_STATE_UNREGISTER",         
 	function ()
-		NetState = uartTask.GISUNLINK_NETMANAGER_DISCONNECTED 
+		NetState = uartTask.GISUNLINK_NETMANAGER_GSM_DISCONNECTED
 		uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
 		--log.warn("System","NET_STATE_UNREGISTER ---------------> GSM 网络发生变化 未注册成功")
 		--
@@ -82,8 +85,8 @@ function subNetState()
 			NetState = uartTask.GISUNLINK_NETMANAGER_CONNECTING
 			uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
 			--log.warn("System","NET_STATE_UNREGISTER ---------------> 链接网络中")
-		else
-			uartTask.sendData(uartTask.GISUNLINK_NETWORK_RSSI,rssi);
+		elseif rssi >= 2 or rssi <= 30 then
+			uartTask.sendData(uartTask.GISUNLINK_NETWORK_RSSI,(rssi * 2) - 113);
 		end
 	end)    
 end
@@ -303,6 +306,9 @@ function uartRecvMsg(packet)
 	else
 		if packet.cmd == uartTask.GISUNLINK_NETWORK_STATUS then 
 			uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
+		elseif packet.cmd == uartTask.GISUNLINK_DEV_SN then
+			local DEV_SN = misc.getImei()
+			uartTask.sendData(uartTask.GISUNLINK_DEV_SN,DEV_SN);
 		end
 	end
 end
@@ -311,14 +317,14 @@ function system_loop()
 	while true do	
 		if statrsynctime == true then 
 			if ntp.isEnd() then
-				log.warn("system","rssi:",net.getRssi(),"heap_size:",rtos.get_fs_free_size(),"Time:",os.time());
+				log.warn("system","rssi:",(net.getRssi() * 2) - 113 ,"heap_size:",rtos.get_fs_free_size(),"Time:",os.time());
 			else
 				NetState = uartTask.GISUNLINK_NETMANAGER_TIME_FAILED
 				uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
-				log.warn("system","rssi:",net.getRssi(),"heap_size:",rtos.get_fs_free_size());
+				log.warn("system","rssi:",(net.getRssi() * 2) - 113,"heap_size:",rtos.get_fs_free_size());
 			end
 		else
-			log.warn("system","rssi:",net.getRssi(),"heap_size:",rtos.get_fs_free_size());
+			log.warn("system","rssi:",(net.getRssi() * 2) - 113,"heap_size:",rtos.get_fs_free_size());
 		end
 		sys.wait(1000);
 	end
