@@ -14,7 +14,7 @@ VERSION = "2.0.0"
 --加载日志功能模块，并且设置日志输出等级
 --如果关闭调用log模块接口输出的日志，等级设置为log.LOG_SILENT即可
 require "log"
-LOG_LEVEL = log.LOGLEVEL_TRACE
+LOG_LEVEL = log.LOG_SILENT --log.LOGLEVEL_TRACE
 --[[
 如果使用UART输出日志，打开这行注释的代码"--log.openTrace(true,1,115200)"即可，根据自己的需求修改此接口的参数
 如果要彻底关闭脚本中的输出日志（包括调用log模块接口和Lua标准print接口输出的日志），执行log.openTrace(false,第二个参数跟调用openTrace接口打开日志的第二个参数相同)，例如：
@@ -55,8 +55,8 @@ wdt.setup(pio.P0_30, pio.P0_31)
 
 --加载错误日志管理功能模块【强烈建议打开此功能】
 --如下2行代码，只是简单的演示如何使用errDump功能，详情参考errDump的api
---require "errDump"
---errDump.request("udp://ota.airm2m.com:9072")
+require "errDump"
+errDump.request("udp://ota.airm2m.com:9072")
 
 --加载远程升级功能模块【强烈建议打开此功能】
 --如下3行代码，只是简单的演示如何使用update功能，详情参考update的api以及demo/update

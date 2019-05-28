@@ -81,12 +81,15 @@ function subNetState()
 
 	sys.subscribe("GSM_SIGNAL_REPORT_IND",         
 	function (success, rssi)
-		if rssi == 0 then
-			NetState = uartTask.GISUNLINK_NETMANAGER_CONNECTING
-			uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
-			--log.warn("System","NET_STATE_UNREGISTER ---------------> 链接网络中")
-		elseif rssi >= 2 or rssi <= 30 then
+		if rssi >= 2 or rssi <= 30 then
 			uartTask.sendData(uartTask.GISUNLINK_NETWORK_RSSI,(rssi * 2) - 113);
+		else
+			if mqttTask.isReady() == false then
+				NetState = uartTask.GISUNLINK_NETMANAGER_CONNECTING
+				uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
+			else 
+				uartTask.sendData(uartTask.GISUNLINK_NETWORK_RSSI,(rssi * 2) - 113);
+			end
 		end
 	end)    
 end
