@@ -51,8 +51,10 @@ function getMqttSrvInfo()
 
 	log.error("getMqttSrvInfo:","Version:"..Version)
 
+	local bodyData = "{\"flag_number\":\""..clientID.."\",\"version\":\""..Version.."\"}" --"flag_number="..clientID.."&version="..Version
+
 	while true do
-		http.request("POST","http://power.fuxiangjf.com/device/mqtt_connect_info",nil,nil,{flag_number=clientID,version=Version},35000,
+		http.request("POST","http://power.fuxiangjf.com/device/mqtt_connect_info",nil,nil,bodyData,35000,
 	    function (respond,statusCode,head,body)
 			sys.publish("GET_SRV_INFO_OF",respond,statusCode,body)
 		end)
