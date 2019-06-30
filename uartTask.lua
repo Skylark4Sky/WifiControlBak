@@ -108,6 +108,7 @@ local waitQueue = {}
 local recvQueue = {} 
 --全局ID
 local packet_id = 0
+local request_packet_id = 0
 
 local MaxDataLen = 512
 --GISUNLINK_PACKET_HEAD_TAIL_SIZE + GISUNLINK_PACKET_LEN_SIZE + GISUNLINK_PACKET_FLOW_SIZE + GISUNLINK_PACKET_DIR_SIZE + GISUNLINK_PACKET_CMD_SIZE + GISUNLINK_PACKET_CHKSUM_SIZE
@@ -458,16 +459,21 @@ local function recvQueueProc()
 			local frameData = table.remove(recvQueue, 1)
 			local packet = parseFrame(frameData)
 			--log.error("recvQueueProc:"..frameData:toHex(" "))
+			--请求包
 			if packet and packet.dir == 0x00 then 
 				if RecvCallback and RecvCallback ~= nil then
 					--回复请求包ACK
 					sendAckPacket(packet)
-					RecvCallback(packet)
+					if packet.id ~= request_packet_id then 
+						request_packet_id = packet.id
+						RecvCallback(packet)
+					end
 				end
 				
 				if packet.cmd == GISUNLINK_TASK_CONTROL then 
 			--		log.error("recvQueue:"..packet.data:toHex(" "))
 				end
+			--回复包
 			elseif packet and packet.dir == 0x01 then
 --				log.error("recvQueueProc:","PacketID:"..packet.id)
 				for k, v in ipairs(waitQueue) do 
