@@ -96,7 +96,7 @@ end
 
 local function firmware_query(firmware) 
 	--GISUNLINK_NEED_UPGRADE = 0x00,   GISUNLINK_NO_NEED_UPGRADE = 0x01,    GISUNLINK_DEVICE_TIMEOUT = 0x02
-	local ret = 0x02
+	local ret = uartTask.GISUNLINK_DEVICE_TIMEOUT
 	if not firmware or firmware == nil then return ret end
 	local rawData = {}
 
@@ -129,8 +129,14 @@ local function firmware_query(firmware)
 	while true do 
 		local result = uartTask.sendData(uartTask.GISUNLINK_DEV_FW_INFO,uartData,true)
 		if result and result.send == uartTask.GISUNLINK_SEND_SUCCEED then
-			send_succeed = true
-			ret = 0x00
+			if result.data ~= nil and #resul.data then 
+				local bytes = getBytes(result.data,1)
+				local status = bytes[1]
+				ret = uartTask.GISUNLINK_NO_NEED_UPGRADE
+				if status == uartTask.GISUNLINK_NEED_UPGRADE then 
+					ret = uartTask.GISUNLINK_NEED_UPGRADE
+				end
+			end
 			break
 		else 
 			send_num = send_num + 1
@@ -173,7 +179,13 @@ local function firmware_transfer(offset,data)
 	while true do 
 		local result = uartTask.sendData(uartTask.GISUNLINK_DEV_FW_TRANS,uartData,true)
 		if result and result.send == uartTask.GISUNLINK_SEND_SUCCEED then
-			send_succeed = true
+			if result.data ~= nil and #resul.data == 2 then 
+				local bytes = getBytes(result.data,2)
+				local respond_offset = bytes[1] + bit.lshift(bytes[2],8)
+				if respond_offset == offset then 
+					send_succeed = true
+				end
+			end
 			break
 		else 
 			send_num = send_num + 1
@@ -187,13 +199,20 @@ local function firmware_transfer(offset,data)
 end
 
 local function firmware_chk()
-	local device_ready = false
+	local ret = uartTask.GISUNLINK_DEVICE_TIMEOUT
 	log.error("firmware_chk:","waiting the device check the firmware")
 	local send_num = 0;
 	while true do 
 		local result = uartTask.sendData(uartTask.GISUNLINK_DEV_FW_READY,nil,true)
 		if result and result.send == uartTask.GISUNLINK_SEND_SUCCEED then
-			device_ready = true
+			if result.data ~= nil and #resul.data then 
+				local bytes = getBytes(result.data,1)
+				local status = bytes[1]
+				ret = uartTask.GISUNLINK_FIRMWARE_CHK_NO_OK
+				if status == uartTask.GISUNLINK_NEED_UPGRADE then 
+					ret = uartTask.GISUNLINK_FIRMWARE_CHK_OK
+				end
+			end
 			break
 		else 
 			send_num = send_num + 1
@@ -203,7 +222,7 @@ local function firmware_chk()
 			break
 		end
 	end
-	return device_ready
+	return ret
 end
 
 function uartTransferCb(exec)

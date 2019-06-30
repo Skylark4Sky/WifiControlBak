@@ -232,13 +232,12 @@ local function firmware_update(update_hook)
 			local clean_version = false
 			--GISUNLINK_NEED_UPGRADE = 0x00,   GISUNLINK_NO_NEED_UPGRADE = 0x01,    GISUNLINK_DEVICE_TIMEOUT = 0x02
 			local transfer = update_hook.query(firmware);
-
-			if transfer == 0x01 then 
+			if transfer == uartTask.GISUNLINK_NO_NEED_UPGRADE then 
 				clean_version = true;
 				log.error("firmware_update","device no need to update firmware")
-			elseif transfer == 0x02 then
+			elseif transfer == uartTask.GISUNLINK_DEVICE_TIMEOUT then
 				log.error("firmware_update:","device is off-line")
-			elseif transfer == 0x00 then
+			elseif transfer == uartTask.GISUNLINK_NEED_UPGRADE then
 				update_hook.update = true
 				update_hook.version = firmware.ver
 				update_hook.send_size = 0
@@ -250,8 +249,14 @@ local function firmware_update(update_hook)
 
 			if transfer_over == true then 
 				log.error("firmware_update:","firmware transfer finish")
-				clean_version = update_hook.check();
-				if clean_version == false then
+				local ret = update_hook.check();
+
+				if ret == uartTask.GISUNLINK_FIRMWARE_CHK_OK then 
+					clean_version = true
+				elseif ret == uartTask.GISUNLINK_DEVICE_TIMEOUT then 
+					log.error("firmware_update:","device is off-line")
+				elseif ret == uartTask.GISUNLINK_FIRMWARE_CHK_NO_OK then
+					clean_version = false
 					log.error("firmware_update:","device check data error!")
 				end
 			else 
