@@ -214,14 +214,15 @@ function uartTransferCb(exec)
 		local time = os.time()
 		local clock = os.clock()
 		local integer,remainder = math.modf(clock);
-		remainder = tonumber(string.format("%.3f", remainder)) * 1000
+		remainder = tonumber(string.format("%.6f", remainder)) * 1000000
+		local pid = ((time%10000)*100000) + remainder 
 		local successString = false
 		if exec.send == uartTask.GISUNLINK_SEND_SUCCEED then 
 			successString = true
 		end
 		local jsonTable =
 		{
-			id = tonumber(time..remainder), 
+			id = pid, 
 			act = packet.act,
 			behavior = packet.behavior,
 			data = {
@@ -241,10 +242,11 @@ function mqttRecvMsg(packet)
 			local time = os.time()
 			local clock = os.clock()
 			local integer,remainder = math.modf(clock);
-			remainder = tonumber(string.format("%.3f", remainder)) * 1000
+			remainder = tonumber(string.format("%.6f", remainder)) * 1000000
+			local pid = ((time%10000)*100000) + remainder 
 			local jsonTable =
 			{
-				id = tonumber(time..remainder), 
+				id = pid, 
 				act = packet.act,
 				behavior = packet.behavior,
 				data = {
@@ -285,7 +287,8 @@ function uartRecvMsg(packet)
 			local time = os.time()
 			local clock = os.clock()
 			local integer,remainder = math.modf(clock);
-			remainder = tonumber(string.format("%.3f", remainder)) * 1000
+			remainder = tonumber(string.format("%.6f", remainder)) * 1000000
+			local pid = ((time%10000)*100000) + remainder 
 			local base64str = ""
 			if #data > 2 then
 				local enc_data = string.sub(data,2,-1)
@@ -294,7 +297,7 @@ function uartRecvMsg(packet)
 
 			local jsonTable =
 			{
-				id = tonumber(time..remainder), 
+				id = pid, 
 				act = "transfer",
 				behavior = behavior,
 				data = base64str,
@@ -303,7 +306,7 @@ function uartRecvMsg(packet)
 
 			local jsonString = json.encode(jsonTable)
 			local topic = "/power_run/"..clientID
-			--log.error("uartRecvMsg:","Topic:"..topic," jsonString:"..jsonString)
+			log.error("uartRecvMsg:","Topic:"..topic," jsonString:"..jsonString)
 			mqttMsg.sendMsg("/power_run/"..clientID,jsonString,0)
 		end
 	else
