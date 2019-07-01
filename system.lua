@@ -129,8 +129,8 @@ local function firmware_query(firmware)
 	while true do 
 		local result = uartTask.sendData(uartTask.GISUNLINK_DEV_FW_INFO,uartData,true)
 		if result and result.send == uartTask.GISUNLINK_SEND_SUCCEED then
-			if result.data ~= nil and #resul.data then 
-				local bytes = getBytes(result.data,1)
+			if result.data ~= nil and #result.data then 
+				local bytes = uartTask.getBytes(result.data,1)
 				local status = bytes[1]
 				ret = uartTask.GISUNLINK_NO_NEED_UPGRADE
 				if status == uartTask.GISUNLINK_NEED_UPGRADE then 
@@ -179,8 +179,8 @@ local function firmware_transfer(offset,data)
 	while true do 
 		local result = uartTask.sendData(uartTask.GISUNLINK_DEV_FW_TRANS,uartData,true)
 		if result and result.send == uartTask.GISUNLINK_SEND_SUCCEED then
-			if result.data ~= nil and #resul.data == 2 then 
-				local bytes = getBytes(result.data,2)
+			if result.data ~= nil and #result.data == 2 then 
+				local bytes = uartTask.getBytes(result.data,2)
 				local respond_offset = bytes[1] + bit.lshift(bytes[2],8)
 				if respond_offset == offset then 
 					send_succeed = true
@@ -205,11 +205,11 @@ local function firmware_chk()
 	while true do 
 		local result = uartTask.sendData(uartTask.GISUNLINK_DEV_FW_READY,nil,true)
 		if result and result.send == uartTask.GISUNLINK_SEND_SUCCEED then
-			if result.data ~= nil and #resul.data then 
-				local bytes = getBytes(result.data,1)
+			if result.data ~= nil and #result.data then 
+				local bytes = uartTask.getBytes(result.data,1)
 				local status = bytes[1]
 				ret = uartTask.GISUNLINK_FIRMWARE_CHK_NO_OK
-				if status == uartTask.GISUNLINK_NEED_UPGRADE then 
+				if status == uartTask.GISUNLINK_FIRMWARE_CHK_OK then 
 					ret = uartTask.GISUNLINK_FIRMWARE_CHK_OK
 				end
 			end
@@ -301,16 +301,17 @@ function uartRecvMsg(packet)
 	if packet.cmd == uartTask.GISUNLINK_TASK_CONTROL then 
 		local data = packet.data
 		if not data or #data > 0 then
-			--	log.error("uartRecvMsg:","data:",data:toHex(" "))
+			--log.error("uartRecvMsg:","data:",data:toHex(" "))
 			local behavior = string.byte(data,1) 
+			local mqtt_ack = string.byte(data,2) 
 			local time = os.time()
 			local clock = os.clock()
 			local integer,remainder = math.modf(clock);
 			remainder = tonumber(string.format("%.6f", remainder)) * 1000000
 			local pid = ((time%10000)*100000) + remainder 
 			local base64str = ""
-			if #data > 2 then
-				local enc_data = string.sub(data,2,-1)
+			if #data > 3 then
+				local enc_data = string.sub(data,3,-1)
 				base64str = crypto.base64_encode(enc_data,#enc_data)
 			end
 
@@ -325,8 +326,12 @@ function uartRecvMsg(packet)
 
 			local jsonString = json.encode(jsonTable)
 			local topic = "/power_run/"..clientID
-			log.error("uartRecvMsg:","Topic:"..topic," jsonString:"..jsonString)
-			mqttMsg.sendMsg("/power_run/"..clientID,jsonString,0)
+			log.error("uartRecvMsg:","Topic:"..topic," mqtt_ack:"..mqtt_ack," jsonString:"..jsonString)
+			if mqtt_ack == MQTT_PUBLISH_NEEDACK then
+				mqttMsg.sendMsg("/power_run/"..clientID,jsonString,0,pid)
+			else
+				mqttMsg.sendMsg("/power_run/"..clientID,jsonString,0)
+			end
 		end
 	else
 		if packet.cmd == uartTask.GISUNLINK_NETWORK_STATUS then 

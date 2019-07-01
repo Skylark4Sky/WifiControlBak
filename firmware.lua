@@ -165,6 +165,7 @@ local function new_firmware_download_proc(update_ctr)
 				firmware.ver = update_ctr.firmware.ver
 				firmware.path = FW_FILE_PATH 
 				firmware.transfer_over = false
+				log.error("new_firmware_download_proc","save firmware info")
 				nvm.set("firmware",firmware)
 			end
 			local task = update_ctr.firmware

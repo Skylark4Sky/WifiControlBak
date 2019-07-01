@@ -107,6 +107,8 @@ GISUNLINK_FIRMWARE_CHK_OK = 0x89
 GISUNLINK_FIRMWARE_CHK_NO_OK = 0x90								
 GISUNLINK_DEVICE_TIMEOUT = 0xff
 
+MQTT_PUBLISH_NOACK = 0x00
+MQTT_PUBLISH_NEEDACK = 0x01
 
 --串口读到的数据缓冲区
 local rdbuf = ""
@@ -134,7 +136,7 @@ function regRecv(cbfun)
 	end
 end
 
-local function getBytes(data,len)
+function getBytes(data,len)
 	if not data or #data < len then return end
 	local index = 1
 	local bytes = {}
@@ -582,7 +584,7 @@ local function waitQueueOpt(Queue,key,value,hash_del)
 				end
 				packet.wb_del = true
 				packet.endTime = curTime;
-				table.insert(hash_del,packet.id)
+				--table.insert(hash_del,packet.id)
 			end
 		end
 	end
