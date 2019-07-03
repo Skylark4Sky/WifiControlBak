@@ -234,7 +234,7 @@ function uartTransferCb(exec)
 		local clock = os.clock()
 		local integer,remainder = math.modf(clock);
 		remainder = tonumber(string.format("%.6f", remainder)) * 1000000
-		local pid = ((time%10000)*100000) + remainder 
+		local pid = ((time%100000)*10000) + remainder 
 		local successString = false
 		if exec.send == uartTask.GISUNLINK_SEND_SUCCEED then 
 			successString = true
@@ -308,7 +308,7 @@ function uartRecvMsg(packet)
 			local clock = os.clock()
 			local integer,remainder = math.modf(clock);
 			remainder = tonumber(string.format("%.6f", remainder)) * 1000000
-			local pid = ((time%10000)*100000) + remainder 
+			local pid = ((time%100000)*10000) + remainder 
 			local base64str = ""
 			if #data > 3 then
 				local enc_data = string.sub(data,3,-1)
