@@ -73,6 +73,8 @@ function download_new_firmware(firmware)
 			download.firmware = firmware;
 			sys.publish("updateFirmware_working")
 		end
+	else	
+		log.error("download_new_firmware","updateFirmware_not_working")
 	end
 	return 
 end
@@ -107,6 +109,8 @@ local function downloadfirmware(firmware)
 			if download_num == 3 then
 				log.error("firmware_update","download_num > 3")
 				break
+			else
+				log.error("downloadfirmware","download retry")
 			end
 		end
 	end
@@ -227,7 +231,7 @@ local function firmware_update(update_hook)
 	if not firmware or firmware.transfer_over == true then
 		log.error("firmware_update","no think to do")
 	else
-		log.error("firmware_update:","firmware:"..firmware.path," md5:"..firmware.path," size:"..firmware.size)
+		log.error("firmware_update:","firmware:"..firmware.path," md5:"..firmware.md5," size:"..firmware.size)
 		if update_hook and update_hook.query and update_hook.transfer and update_hook.check then 
 			local transfer_over = false
 			local clean_version = false

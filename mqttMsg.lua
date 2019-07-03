@@ -9,6 +9,7 @@ module(...,package.seeall)
 
 require "utils"
 require "sys"
+require "mqttTask"
 require "mqttOutMsg"
 
 local Queue = {} --发送队列
@@ -30,6 +31,7 @@ function insertQueue(topic,payload)
 end
 
 function sendMsg(topic,payload,qos,publish_id,user) 
+	if mqttTask.isReady() == false then return end 
 	if publish_id ~= nil then 
 		local item = {}
 		item.topic = topic
@@ -42,9 +44,19 @@ function sendMsg(topic,payload,qos,publish_id,user)
 		item.user = user
 		item.wb_del = false
 		table.insert(WaitAckQueue, item)
-		log.error("sendMsg:","PacketID:",publish_id);
+		log.error("MqttSendMsg:","publish_id:",publish_id);
 	end
+	log.error("MqttSendMsg:","Topic:"..topic," jsonString:"..payload)
 	mqttOutMsg.insertMsg(topic,payload,qos,user)
+end
+
+local function get_resp_id(resp) 
+	local resp_id = 0
+	if resp["req_id"] then 
+		resp_id = resp["req_id"]
+		log.error("get_resp_id:","req_id:",resp_id);
+	end
+	return resp_id
 end
 
 local function procMsg(topic,payload)
@@ -59,20 +71,13 @@ local function procMsg(topic,payload)
 			if json["behavior"] then packet.behavior = json["behavior"] else log.error("procMsg","behavior error") return nil end
 		end
 		if packet.act == "resp" then
-			local dataJson,result,err = json.decode(packet.data)
-			log.error("waitAckQueue:","dataJson:",dataJson);
-			if result and type(dataJson) == "table" then
-				if dataJson["req_id"] then 
-					local req_id = dataJson["req_id"]
-					log.error("waitAckQueue:","req_id:",req_id);
-					for k, v in ipairs(waitAckQueue) do 
-						local waitPacket = v
-						if waitPacket.publish_id == req_id and waitPacket.wb_del == false then
-							waitPacket.wb_del = true
-						elseif waitPacket.publish_id == req_id then 
-							log.error("waitAckQueue:","PacketID:",waitPacket.publish_id,"wb_del:",waitPacket.wb_del);
-						end
-					end
+			local resp_id = get_resp_id(packet.data)
+			for k, v in ipairs(WaitAckQueue) do 
+				local waitPacket = v
+				if waitPacket.publish_id == resp_id and waitPacket.wb_del == false then
+					waitPacket.wb_del = true
+				elseif waitPacket.publish_id == resp_id then 
+					log.error("WaitAckQueue:","PacketID:",waitPacket.publish_id,"wb_del:",waitPacket.wb_del);
 				end
 			end
 			return nil
@@ -115,7 +120,7 @@ local function waitAckQueueOpt(Queue,key,value,hash_del)
 				mqttOutMsg.insertMsg(packet.topic,packet.payload,packet.qos,packet.user)
 			else
 				packet.wb_del = true
-			--	table.insert(hash_del,packet.publish_id)
+				--	table.insert(hash_del,packet.publish_id)
 			end
 		end
 	end
@@ -134,7 +139,7 @@ end
 
 local function WaitAckQueueProc() 
 	while true do	
-		sys.waitUntil("WaitAckQueue_working", 100) 
+		sys.waitUntil("WaitAckQueue_working", 500) 
 		if #WaitAckQueue > 0 then
 			local hash_del = {};
 			for k, v in ipairs(WaitAckQueue) do 

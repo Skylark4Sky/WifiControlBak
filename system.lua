@@ -127,6 +127,7 @@ local function firmware_query(firmware)
 
 	local send_num = 0;
 	while true do 
+		log.error("firmware_query","send firmware_ver:"..firmware.ver,"md5:"..firmware.md5,"size:"..firmware.size)
 		local result = uartTask.sendData(uartTask.GISUNLINK_DEV_FW_INFO,uartData,true)
 		if result and result.send == uartTask.GISUNLINK_SEND_SUCCEED then
 			if result.data ~= nil and #result.data then 
@@ -177,6 +178,7 @@ local function firmware_transfer(offset,data)
 
 	local send_num = 0;
 	while true do 
+		log.error("firmware_transfer","send firmware_transfer offset:"..offset.." len:"..#data)
 		local result = uartTask.sendData(uartTask.GISUNLINK_DEV_FW_TRANS,uartData,true)
 		if result and result.send == uartTask.GISUNLINK_SEND_SUCCEED then
 			if result.data ~= nil and #result.data == 2 then 
@@ -200,9 +202,9 @@ end
 
 local function firmware_chk()
 	local ret = uartTask.GISUNLINK_DEVICE_TIMEOUT
-	log.error("firmware_chk:","waiting the device check the firmware")
 	local send_num = 0;
 	while true do 
+		log.error("firmware_chk:","waiting the device check the firmware")
 		local result = uartTask.sendData(uartTask.GISUNLINK_DEV_FW_READY,nil,true)
 		if result and result.send == uartTask.GISUNLINK_SEND_SUCCEED then
 			if result.data ~= nil and #result.data then 
@@ -326,7 +328,6 @@ function uartRecvMsg(packet)
 
 			local jsonString = json.encode(jsonTable)
 			local topic = "/power_run/"..clientID
-			log.error("uartRecvMsg:","Topic:"..topic," mqtt_ack:"..mqtt_ack," jsonString:"..jsonString)
 			if mqtt_ack == MQTT_PUBLISH_NEEDACK then
 				mqttMsg.sendMsg("/power_run/"..clientID,jsonString,0,pid)
 			else
