@@ -32,13 +32,13 @@ end
 
 function sendMsg(topic,payload,qos,publish_id,user) 
 	if mqttTask.isReady() == false then return end 
-	if publish_id ~= nil then 
+	if publish_id and publish_id ~= nil then 
 		local item = {}
 		item.topic = topic
 		item.payload = payload
 		item.retry = 2
 		item.start_ticks = os.clock() 
-		item.timeout_ticks = 3000
+		item.timeout_ticks = 5500
 		item.publish_id = publish_id
 		item.qos = qos
 		item.user = user
@@ -116,7 +116,7 @@ local function waitAckQueueOpt(Queue,key,value,hash_del)
 				log.error("waitAckQueueOpt:","PacketID:",packet.publish_id,"start_ticks:",packet.start_ticks,"curTime:",curTime,"retry:",packet.retry);
 				packet.retry = packet.retry - 1
 				packet.start_ticks = os.clock() 
-				packet.timeout_ticks = 5000
+				packet.timeout_ticks = 8500
 				mqttOutMsg.insertMsg(packet.topic,packet.payload,packet.qos,packet.user)
 			else
 				packet.wb_del = true
