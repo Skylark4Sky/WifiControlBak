@@ -56,9 +56,11 @@ function download_new_firmware(firmware)
 		if last_download_task.md5 ~= firmware.md5 then 
 			if firmware.ver >= last_download_task.ver then
 				download_start = true;
+			else 
+				log.error("firmware_update","the last version >= new download_task")
 			end
 		else
-			log.error("firmware_update","the version are the smae")
+			log.error("firmware_update","the md5 are the smae")
 		end
 	end
 
@@ -83,10 +85,12 @@ local function downloadfirmware(firmware)
 	local download_path = nil
 	if not firmware or not firmware.url or not firmware.md5 then log.error("downloadfirmware","exit download task") return end
 	local download_num = 0;
+	local fileSize = 0;
 	while true do
 		os.remove(UPD_FILE_PATH)
 		if firmware.size >= rtos.get_fs_free_size() then break end;
-
+		fileSize = 0;
+		download_path = nil;
 		http.request("GET",firmware.url,nil,nil,nil,60000,function (respond,statusCode,head,filePath) 
 			sys.publish("UPDATE_DOWNLOAD",respond,statusCode,head,filePath)
 		end,UPD_FILE_PATH)
@@ -95,7 +99,7 @@ local function downloadfirmware(firmware)
 
 		if result then 
 			if statusCode == "200" then
-				local fileSize = io.fileSize(UPD_FILE_PATH)
+				fileSize = io.fileSize(UPD_FILE_PATH)
 				if fileSize == firmware.size then 
 					download_path = UPD_FILE_PATH					
 					log.error("firmware_update","download finish")
@@ -114,7 +118,7 @@ local function downloadfirmware(firmware)
 			end
 		end
 	end
-	return download_path
+	return download_path,fileSize
 end
 
 local function chk_md5(filePath,md5)
@@ -147,10 +151,10 @@ end
 
 local function new_firmware_download_proc(update_ctr)
 	while update_ctr.enable == true do
-		local filePath =  downloadfirmware(update_ctr.firmware)
+		local filePath,fileSize =  downloadfirmware(update_ctr.firmware)
 		local chk_md5_ok = false 
 
-		if filePath then
+		if filePath and fileSize == update_ctr.firmware.size then
 			if chk_md5(filePath,update_ctr.firmware.md5) == true then 
 				chk_md5_ok = true
 			end
@@ -174,6 +178,7 @@ local function new_firmware_download_proc(update_ctr)
 			end
 			local task = update_ctr.firmware
 			task.download_over = true
+			log.error("exit download and save download_task")
 			nvm.set("download_task",task)
 			--退出下载
 			update_ctr.enable = false
@@ -187,10 +192,11 @@ end
 
 local function download_check(last_task)
 	if not last_task then 
+		log.error("download_check","no last_task")
 		return true
 	else
 		if last_task.download_over and last_task.download_over == true then
-			log.error("download_check:"..last_task.ver)
+			log.error("download_check","last_task.ver:"..last_task.ver," download_over:",last_task.download_over)
 			return true
 		end
 	end

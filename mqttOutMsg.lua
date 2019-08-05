@@ -13,7 +13,8 @@ module(...,package.seeall)
 local msgQuene = {}
 
 function insertMsg(topic,payload,qos,user)
-    table.insert(msgQuene,{t=topic,p=payload,q=qos,user=user})
+	table.insert(msgQuene,{t=topic,p=payload,q=qos,user=user})
+    --table.insert(msgQuene,{t=topic,p=payload,q=qos,user={cb=FilterRstCb}})	
 end
 
 local function PubHeartPerMinCb(result)
@@ -26,7 +27,7 @@ function PubHeartPerMin()
 end
 
 function FilterRstCb(result)
-    log.error("mqttOutMsg.FilterRst",result,"alive","id:gsl_"..misc.getImei().." reset:1")--打印心跳信息发送结果
+    log.error("mqttOutMsg.FilterRst",result,"alive")--打印心跳信息发送结果
 end
 
 function FilterRst()
@@ -45,7 +46,7 @@ end
 -- @usage mqttOutMsg.unInit()
 function unInit()
     sys.timerStop(PubHeartPerMin)
-    while #msgQuene>0 do
+    while #msgQuene > 0 do
         local outMsg = table.remove(msgQuene,1)
         if outMsg.user and outMsg.user.cb then outMsg.user.cb(false,outMsg.user.para) end
     end

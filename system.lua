@@ -49,7 +49,7 @@ function subNetState()
 		end
 		if statrsynctime == false then
 			statrsynctime = true;
-			ntp.setServers({"cn.ntp.org.cn","hk.ntp.org.cn","tw.ntp.org.cn"}) --设置时间同步
+			ntp.setServers({"ntp.yidianting.xin","cn.ntp.org.cn","hk.ntp.org.cn","tw.ntp.org.cn"}) --设置时间同步
 			ntp.timeSync(24,sntpCb)
 		end	
 		--log.warn("System","NET_STATE_REGISTERED ---------------> GSM 网络发生变化 注册成功")
@@ -329,7 +329,7 @@ function uartRecvMsg(packet)
 			local jsonString = json.encode(jsonTable)
 			local topic = "/power_run/"..clientID
 			if mqtt_ack == uartTask.MQTT_PUBLISH_NEEDACK then
-				mqttMsg.sendMsg("/power_run/"..clientID,jsonString,0,pid)
+				mqttMsg.sendMsg("/power_run/"..clientID,jsonString,2,pid)
 			else
 				mqttMsg.sendMsg("/power_run/"..clientID,jsonString,0)
 			end
