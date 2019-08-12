@@ -18,14 +18,26 @@ require "firmware"
 require "mqttTask"
 
 local statrsynctime = false
+local waitHWSn = false
+local DeviceHWSn = nil 
 local timeSyncOk = false
 local isTimeSyncStart = false
 local update_hook = {update = false,version = 0,file_size = 0,send_size = 0}
+local update_retry = false
+local update_retry_tick = 0
 
 local NetState = uartTask.GISUNLINK_NETMANAGER_IDLE 
 
 function isTimeSyncOk()
     return timeSyncOk
+end
+
+function isGetHWSnOk()
+    return waitHWSn
+end
+
+function GetDeviceHWSn()
+    return DeviceHWSn 
 end
 
 function sntpCb()
@@ -147,6 +159,12 @@ local function firmware_query(firmware)
 			break
 		end
 	end
+
+	--如果下位机返回设备超时需要置重试标志位
+	if ret == uartTask.GISUNLINK_DEVICE_TIMEOUT then 
+		update_retry = true
+	end
+
 	return ret
 end
 
@@ -298,7 +316,7 @@ end
 
 function uartRecvMsg(packet)
 	if not packet or packet == nil then return end
-	local clientID = "gsl_"..misc.getImei()
+--	local clientID = "gsl_"..misc.getImei()
 	--这里上传stm32发来的透传数据
 	if packet.cmd == uartTask.GISUNLINK_TASK_CONTROL then 
 		local data = packet.data
@@ -327,11 +345,13 @@ function uartRecvMsg(packet)
 			}
 
 			local jsonString = json.encode(jsonTable)
-			local topic = "/power_run/"..clientID
+--			local topic = "/power_run/"..clientID
 			if mqtt_ack == uartTask.MQTT_PUBLISH_NEEDACK then
-				mqttMsg.sendMsg("/power_run/"..clientID,jsonString,2,pid)
+--				mqttMsg.sendMsg("/power_run/"..clientID,jsonString,2,pid)
+				mqttMsg.sendMsg("/power_run",jsonString,2,pid)
 			else
-				mqttMsg.sendMsg("/power_run/"..clientID,jsonString,0)
+				mqttMsg.sendMsg("/power_run",jsonString,0)
+--				mqttMsg.sendMsg("/power_run/"..clientID,jsonString,0)
 			end
 		end
 	else
@@ -344,12 +364,46 @@ function uartRecvMsg(packet)
 	end
 end
 
+function wait_hw_sn() 
+	while true do 
+		log.error("waiting the device sn")
+		local result = uartTask.sendData(uartTask.GISUNLINK_HW_SN,nil,true)
+		if result and result.send == uartTask.GISUNLINK_SEND_SUCCEED then
+			if result.data ~= nil and #result.data == 12 then 
+				local bytes = uartTask.getBytes(result.data,12)
+				DeviceHWSn = string.format("%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", bytes[1],bytes[2],bytes[3],bytes[4],bytes[5],bytes[6],bytes[7],bytes[8],bytes[9],bytes[10],bytes[11],bytes[12])
+				log.error("device sn:"..DeviceHWSn)
+				break
+			end
+		else 
+			log.error("waiting the device sn:","send failed reason:"..result.reason)
+		end
+	end
+end
+
 function system_loop()
 	while true do	
+		if waitHWSn == false then 
+			--等设备串号
+			wait_hw_sn()
+			waitHWSn = true
+		end
 		if statrsynctime == true then 
 			if ntp.isEnd() then
 				log.warn("system","rssi:",(net.getRssi() * 2) - 113 ,"heap_size:",rtos.get_fs_free_size(),"Time:",os.time());
 			else
+
+				--如果update_retry == true的时候，说明下位正再忙。。需要隔断时间尝试下发升级
+				if update_retry == true then 
+					update_retry_tick = update_retry_tick + 1
+					if update_retry_tick == 60 then 
+						--发送升级信号
+						firmware.system_start_signal()
+						update_retry = false
+						update_retry_tick = 0;
+					end
+				end
+
 				NetState = uartTask.GISUNLINK_NETMANAGER_TIME_FAILED
 				uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
 				log.warn("system","rssi:",(net.getRssi() * 2) - 113,"heap_size:",rtos.get_fs_free_size());
@@ -373,5 +427,5 @@ update_hook.transfer = firmware_transfer
 update_hook.check = firmware_chk
 
 firmware.updateCb(update_hook) --升级回调
---sys.timerLoopStart(System_loop,1000)
+
 sys.taskInit(system_loop)

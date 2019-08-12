@@ -32,8 +32,10 @@ local function procRespond(jsonstring)
     if result and type(json) == "table" then
 		if json["code"] then respond.code = json["code"] else log.error("procRespond","code") return nil end
 		if json["data"] then respond.info = json["data"] else log.error("procRespond","data") return nil end
+
 		if not respond.info["mqtt_host"] and not respond.info["mqtt_port"] then log.error("procRespond","data->sub") return nil end
 		if not respond.info["username"] and not respond.info["password"] then log.error("procRespond","data->sub") return nil end
+--		if not respond.info["topic_flag"] then log.error("procRespond","data->sub") return nil end
 		return respond 
     end
 	return nil
@@ -41,7 +43,6 @@ end
 
 function getMqttSrvInfo()
 	local server = nil 
-	local clientID = "gsl_"..misc.getImei()
 	local Version = "unknown" 
 	local firmware = nvm.get("firmware")
 
@@ -51,7 +52,9 @@ function getMqttSrvInfo()
 
 	log.error("getMqttSrvInfo:","Version:"..Version)
 
-	local bodyData = "{\"flag_number\":\""..clientID.."\",\"version\":\""..Version.."\"}" --"flag_number="..clientID.."&version="..Version
+	local clientID = "gsl_"..misc.getImei()
+	local bodyData = "{\"flag_number\":\""..clientID.."\",\"version\":\""..Version.."\",\"device_sn\":\""..system.GetDeviceHWSn().."\"}" --"flag_number="..clientID.."&version="..Version
+	log.error("getMqttSrvInfo:","PostData:"..bodyData)
 
 	while true do
 		http.request("POST","http://power.fuxiangjf.com/device/mqtt_connect_info",nil,nil,bodyData,35000,
@@ -88,7 +91,7 @@ function()
 		end
 
 		if socket.isReady() then
-			while system.isTimeSyncOk() == false do
+			while system.isTimeSyncOk() == false or system.isGetHWSnOk() == false do
 				log.error("system.istimeSyncOk == false")
 				sys.wait(1000);
 			end
@@ -111,12 +114,12 @@ function()
 				firmware.system_start_signal()
 				sys.publish("GISUNLINK_NETMANAGER_CONNECTED_SER")
 				--订阅主题
-				if mqttClient:subscribe({["/point_common"]=0, ["/point_switch/"..clientID]=0}) then
+				if mqttClient:subscribe({["/point_common"]=0, ["/point_switch/"..system.GetDeviceHWSn()]=0}) then
 					--mqttOutMsg.init()
 					--循环处理接收和发送的数据
 					while true do
 						if not mqttInMsg.proc(mqttClient) then log.error("mqttTask.mqttInMsg.proc error") break end
-						if not mqttOutMsg.proc(mqttClient) then log.error("mqttTask.mqttOutMsg proc error") break end
+						if not mqttOutMsg.proc(mqttClient,system.GetDeviceHWSn()) then log.error("mqttTask.mqttOutMsg proc error") break end
 						GprsNetRdy = true
 					end
 					mqttOutMsg.unInit()

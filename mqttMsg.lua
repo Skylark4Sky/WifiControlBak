@@ -38,7 +38,7 @@ function SendRespondCb(result,publish_id)
 			if waitPacket.publish_id == resp_id and waitPacket.wb_del == false then
 				if result == true then
 					waitPacket.wb_del = true
-				log.error("SendRespondCb:","PacketID:",waitPacket.publish_id,"wb_del:",waitPacket.wb_del);
+		--		log.error("SendRespondCb:","PacketID:",waitPacket.publish_id,"wb_del:",waitPacket.wb_del);
 				end				
 			end
 		end   
@@ -58,24 +58,24 @@ function sendMsg(topic,payload,qos,publish_id,user)
 		item.user = user
 		item.wb_del = false
 		table.insert(WaitAckQueue, item)
-		log.error("MqttSendMsg:","publish_id:",publish_id,"Topic:"..topic)
+		--log.error("MqttSendMsg:","publish_id:",publish_id,"Topic:"..topic)
 		mqttOutMsg.insertMsg(topic,payload,qos,{cb=SendRespondCb,para=publish_id})
 		
 	else
-		log.error("MqttSendMsg:","Topic:"..topic)	
+		--log.error("MqttSendMsg:","Topic:"..topic)	
 		mqttOutMsg.insertMsg(topic,payload,qos,user)
 	end
 	--log.error("MqttSendMsg:","Topic:"..topic," jsonString:"..payload)
 end
 
-local function get_resp_id(resp) 
-	local resp_id = 0
-	if resp["req_id"] then 
-		resp_id = resp["req_id"]
+--local function get_resp_id(resp) 
+--	local resp_id = 0
+--	if resp["req_id"] then 
+--		resp_id = resp["req_id"]
 		--log.error("get_resp_id:","req_id:",resp_id);
-	end
-	return resp_id
-end
+--	end
+--	return resp_id
+--end
 
 local function procMsg(topic,payload)
 	local packet = {}
@@ -89,16 +89,16 @@ local function procMsg(topic,payload)
 			if json["behavior"] then packet.behavior = json["behavior"] else log.error("procMsg","behavior error") return nil end
 		end
 		if packet.act == "resp" then
-			local resp_id = get_resp_id(packet.data)
-			for k, v in ipairs(WaitAckQueue) do 
-				local waitPacket = v
-				if waitPacket.publish_id == resp_id and waitPacket.wb_del == false then
-					waitPacket.wb_del = true
-					log.error("get_resp_id:","req_id:",resp_id);
-				elseif waitPacket.publish_id == resp_id then 
-					--log.error("WaitAckQueue:","PacketID:",waitPacket.publish_id,"wb_del:",waitPacket.wb_del);
-				end
-			end
+--			local resp_id = get_resp_id(packet.data)
+--			for k, v in ipairs(WaitAckQueue) do 
+--				local waitPacket = v
+--				if waitPacket.publish_id == resp_id and waitPacket.wb_del == false then
+--					waitPacket.wb_del = true
+--					log.error("get_resp_id:","req_id:",resp_id);
+--				elseif waitPacket.publish_id == resp_id then 
+--					--log.error("WaitAckQueue:","PacketID:",waitPacket.publish_id,"wb_del:",waitPacket.wb_del);
+--				end
+--			end
 			return nil
 		end
 		return packet
