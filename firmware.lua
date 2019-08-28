@@ -30,6 +30,7 @@ end
 
 function system_start_signal()
 	if download.enable == false then
+		log.error("system_start_signal","updateFirmware_working");
 		sys.publish("updateFirmware_working")
 	end
 end
@@ -235,9 +236,9 @@ end
 local function firmware_update(update_hook)
 	local firmware = nvm.get("firmware")
 	if not firmware or firmware.transfer_over == true then
-		log.error("firmware_update","no think to do")
+		log.error("check local firmware file:","no think to do")
 	else
-		log.error("firmware_update:","firmware:"..firmware.path," md5:"..firmware.md5," size:"..firmware.size)
+		log.error("check local firmware file::","firmware:"..firmware.path," md5:"..firmware.md5," size:"..firmware.size)
 		if update_hook and update_hook.query and update_hook.transfer and update_hook.check then 
 			local transfer_over = false
 			local clean_version = false
@@ -245,9 +246,9 @@ local function firmware_update(update_hook)
 			local transfer = update_hook.query(firmware);
 			if transfer == uartTask.GISUNLINK_NO_NEED_UPGRADE then 
 				clean_version = true;
-				log.error("firmware_update","device no need to update firmware")
+				log.error("local firmware file:","device no need to update firmware")
 			elseif transfer == uartTask.GISUNLINK_DEVICE_TIMEOUT then
-				log.error("firmware_update:","device is off-line")
+				log.error("local firmware file:","device is off-line")
 			elseif transfer == uartTask.GISUNLINK_NEED_UPGRADE then
 				update_hook.update = true
 				update_hook.version = firmware.ver
@@ -259,19 +260,19 @@ local function firmware_update(update_hook)
 			end
 
 			if transfer_over == true then 
-				log.error("firmware_update:","firmware transfer finish")
+				log.error("local firmware file:","firmware transfer finish")
 				local ret = update_hook.check();
 
 				if ret == uartTask.GISUNLINK_FIRMWARE_CHK_OK then 
 					clean_version = true
 				elseif ret == uartTask.GISUNLINK_DEVICE_TIMEOUT then 
-					log.error("firmware_update:","device is off-line")
+					log.error("local firmware file:","device is off-line")
 				elseif ret == uartTask.GISUNLINK_FIRMWARE_CHK_NO_OK then
 					clean_version = false
-					log.error("firmware_update:","device check data error!")
+					log.error("local firmware file:","device check data error!")
 				end
 			else 
-				log.error("firmware_update:","firmware transfer unfinished")
+				log.error("local firmware file:","firmware transfer unfinished")
 			end
 
 			if clean_version == true then
@@ -279,7 +280,7 @@ local function firmware_update(update_hook)
 				firmware.transfer_over = true
 				nvm.set("firmware",firmware)
 				if transfer_over == true then
-					log.error("firmware_update","device succeed receive data!")
+					log.error("local firmware file","device succeed receive data!")
 				end
 			end
 		end

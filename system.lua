@@ -163,7 +163,11 @@ local function firmware_query(firmware)
 	--如果下位机返回设备超时需要置重试标志位
 	if ret == uartTask.GISUNLINK_DEVICE_TIMEOUT then 
 		update_retry = true
+	else
+		update_retry = false
 	end
+	
+	log.error("firmware_query",update_retry)
 
 	return ret
 end
@@ -390,20 +394,19 @@ function system_loop()
 		end
 		if statrsynctime == true then 
 			if ntp.isEnd() then
-				log.warn("system","rssi:",(net.getRssi() * 2) - 113 ,"heap_size:",rtos.get_fs_free_size(),"Time:",os.time());
-			else
-
+			
 				--如果update_retry == true的时候，说明下位正再忙。。需要隔断时间尝试下发升级
 				if update_retry == true then 
 					update_retry_tick = update_retry_tick + 1
-					if update_retry_tick == 60 then 
+					if update_retry_tick >= 60 then 											
+						update_retry_tick = 0;
+						log.error("retry send firmware",update_retry_tick);
 						--发送升级信号
 						firmware.system_start_signal()
-						update_retry = false
-						update_retry_tick = 0;
 					end
 				end
-
+				log.warn("system","rssi:"..(net.getRssi() * 2) - 113 ,"heap_size:"..rtos.get_fs_free_size(),"Time:"..os.time(),"update_retry:",update_retry,"retry_tick"..update_retry_tick);
+			else
 				NetState = uartTask.GISUNLINK_NETMANAGER_TIME_FAILED
 				uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
 				log.warn("system","rssi:",(net.getRssi() * 2) - 113,"heap_size:",rtos.get_fs_free_size());
