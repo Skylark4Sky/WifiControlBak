@@ -166,6 +166,8 @@ local function firmware_query(firmware)
 	else
 		update_retry = false
 	end
+
+	update_retry_tick = 0;
 	
 	log.error("firmware_query",update_retry)
 
