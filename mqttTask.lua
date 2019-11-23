@@ -114,7 +114,7 @@ function()
 				firmware.system_start_signal()
 				sys.publish("GISUNLINK_NETMANAGER_CONNECTED_SER")
 				--订阅主题
-				if mqttClient:subscribe({["/point_common"]=0, ["/point_switch/"..system.GetDeviceHWSn()]=0}) then
+				if mqttClient:subscribe({["/point_common"]=0, ["/point_common/"..system.GetDeviceHWSn()]=0, ["/point_switch/"..system.GetDeviceHWSn()]=0}) then
 					--mqttOutMsg.init()
 					--循环处理接收和发送的数据
 					while true do

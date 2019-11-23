@@ -25,6 +25,8 @@ local isTimeSyncStart = false
 local update_hook = {update = false,version = 0,file_size = 0,send_size = 0}
 local update_retry = false
 local update_retry_tick = 0
+local netIsConnect = false
+local sntpsynccopy = 0
 
 local NetState = uartTask.GISUNLINK_NETMANAGER_IDLE 
 
@@ -40,11 +42,22 @@ function GetDeviceHWSn()
     return DeviceHWSn 
 end
 
-function sntpCb()
+
+function sntpOKCb()--成功之后
 	log.warn("System","TimeSync OK");
 	timeSyncOk = true;
+	--sntpsynccopy = NetState;
 	NetState = uartTask.GISUNLINK_NETMANAGER_TIME_SUCCEED
 	uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
+	
+	if netIsConnect == true then 
+		sys.timerStart(function()
+			if netIsConnect == true then
+				NetState = uartTask.GISUNLINK_NETMANAGER_CONNECTED_SER
+				uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
+			end
+		end,5000)
+	end
 end
 
 function subNetState()
@@ -62,7 +75,7 @@ function subNetState()
 		if statrsynctime == false then
 			statrsynctime = true;
 			ntp.setServers({"ntp.yidianting.xin","cn.ntp.org.cn","hk.ntp.org.cn","tw.ntp.org.cn"}) --设置时间同步
-			ntp.timeSync(24,sntpCb)
+			ntp.timeSync(24,sntpOKCb)
 		end	
 		--log.warn("System","NET_STATE_REGISTERED ---------------> GSM 网络发生变化 注册成功")
 	end)    
@@ -77,6 +90,7 @@ function subNetState()
 
 	sys.subscribe("GISUNLINK_NETMANAGER_CONNECTED_SER",         
 	function ()
+		netIsConnect = true
 		NetState = uartTask.GISUNLINK_NETMANAGER_CONNECTED_SER 
 		uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
 		--log.warn("System","NET_STATE_UNREGISTER ---------------> 已连上平台")
@@ -85,6 +99,7 @@ function subNetState()
 
 	sys.subscribe("GISUNLINK_NETMANAGER_DISCONNECTED_SER",         
 	function ()
+		netIsConnect = false
 		NetState = uartTask.GISUNLINK_NETMANAGER_DISCONNECTED_SER
 		uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
 		--log.warn("System","NET_STATE_UNREGISTER ---------------> 已断开平台")
@@ -280,6 +295,16 @@ function uartTransferCb(exec)
 	end
 end
 
+function postSimCardInfo ()
+	sys.timerStart(function()
+		local icCID = sim.getIccid() 
+		local Imsi = sim.getImsi()
+		local clientID = "gsl_"..misc.getImei()	
+		local bodyData = "{\"flag_number\":\""..clientID.."\",\"sim_iccid\":\""..icCID.."\",\"sim_imsi\":\""..Imsi.."\"}"
+		http.request("POST","http://power.fuxiangjf.com/device/sim_info",nil,nil,bodyData,35000,nil)
+    end,500)
+end
+
 function mqttRecvMsg(packet)
 	if not packet or packet == nil then return end
 	if packet.act == "transfer" then --正常传输命令
@@ -317,6 +342,8 @@ function mqttRecvMsg(packet)
 		end
 	elseif packet.act == "update_ver" then --升级命令
 		firmware.download_new_firmware(packet.data)
+	elseif packet.act == "get_sim" then --获取sim卡信息
+		
 	end
 end
 
