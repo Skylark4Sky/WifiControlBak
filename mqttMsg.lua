@@ -136,7 +136,6 @@ local function waitAckQueueOpt(Queue,key,value,hash_del)
 				packet.retry = packet.retry - 1
 				packet.start_ticks = os.clock() 
 				packet.timeout_ticks = 5500--8500
-				--mqttOutMsg.insertMsg(packet.topic,packet.payload,packet.qos,packet.user)
 				mqttOutMsg.insertMsg(packet.topic,packet.payload,packet.qos,packet.user)
 			else
 				packet.wb_del = true

@@ -7,6 +7,7 @@
 
 module(...,package.seeall)
 
+require "misc"
 require "rtos"
 require "os"
 require "ntp"
@@ -17,21 +18,23 @@ require "mqttMsg"
 require "firmware"
 require "mqttTask"
 
-local statrsynctime = false
 local waitHWSn = false
-local DeviceHWSn = nil 
-local timeSyncOk = false
-local isTimeSyncStart = false
-local update_hook = {update = false,version = 0,file_size = 0,send_size = 0}
+local DeviceHWSn = "gsl_"..misc.getImei() 
+local waitFirmwareVersion = false
+local FirmwareVersion = "unkown"
+
+local statrsynctime = false
+
 local update_retry = false
 local update_retry_tick = 0
-local netIsConnect = false
-local sntpsynccopy = 0
+local update_hook = {update = false,version = 0,file_size = 0,send_size = 0}
+
+local sim_registered = false
 
 local NetState = uartTask.GISUNLINK_NETMANAGER_IDLE 
 
-function isTimeSyncOk()
-    return timeSyncOk
+function isSimRegistered() 
+	return sim_registered
 end
 
 function isGetHWSnOk()
@@ -42,98 +45,107 @@ function GetDeviceHWSn()
     return DeviceHWSn 
 end
 
+function GetFirmwareVersion()
+    return FirmwareVersion 
+end
 
-function sntpOKCb()--成功之后
+function sntpOKCb()
 	log.warn("System","TimeSync OK");
-	timeSyncOk = true;
-	--sntpsynccopy = NetState;
-	NetState = uartTask.GISUNLINK_NETMANAGER_TIME_SUCCEED
-	uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
-	
-	if netIsConnect == true then 
-		sys.timerStart(function()
-			if netIsConnect == true then
-				NetState = uartTask.GISUNLINK_NETMANAGER_CONNECTED_SER
-				uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
-			end
-		end,5000)
-	end
 end
 
 function subNetState()
 	sys.subscribe("NET_STATUS_IND",         
 	function ()
 		log.warn("System","NET_STATUS_IND ---------------> NET_STATUS_IND")
-	end)    
+	end)
 
 	sys.subscribe("NET_STATE_REGISTERED",         
 	function ()
-		if mqttTask.isReady() == false then 
-			NetState = uartTask.GISUNLINK_NETMANAGER_GSM_CONNECTED 
-			uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
-		end
-		if statrsynctime == false then
-			statrsynctime = true;
-			ntp.setServers({"ntp.yidianting.xin","cn.ntp.org.cn","hk.ntp.org.cn","tw.ntp.org.cn"}) --设置时间同步
-			ntp.timeSync(24,sntpOKCb)
-		end	
-		--log.warn("System","NET_STATE_REGISTERED ---------------> GSM 网络发生变化 注册成功")
+		sim_registered = true
+		NetState = uartTask.GISUNLINK_NETMANAGER_GSM_CONNECTED 
+		uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);	
 	end)    
 
 	sys.subscribe("NET_STATE_UNREGISTER",         
 	function ()
 		NetState = uartTask.GISUNLINK_NETMANAGER_GSM_DISCONNECTED
 		uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
-		--log.warn("System","NET_STATE_UNREGISTER ---------------> GSM 网络发生变化 未注册成功")
-		--
 	end)    
+
+	sys.subscribe("GISUNLINK_NETMANAGER_START",
+	function ()
+		NetState = uartTask.GISUNLINK_NETMANAGER_START 
+		uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
+	end)
+
+	sys.subscribe("GISUNLINK_NETMANAGER_CONNECTING",
+	function ()
+		NetState = uartTask.GISUNLINK_NETMANAGER_CONNECTING 
+		uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
+	end)
+
+	sys.subscribe("GISUNLINK_NETMANAGER_RECONNECTING",
+	function ()
+		NetState = uartTask.GISUNLINK_NETMANAGER_RECONNECTING 
+		uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
+	end)
+	
+	sys.subscribe("GISUNLINK_NETMANAGER_DISCONNECTED",
+	function ()
+		NetState = uartTask.GISUNLINK_NETMANAGER_DISCONNECTED 
+		uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
+	end)	
 
 	sys.subscribe("GISUNLINK_NETMANAGER_CONNECTED_SER",         
 	function ()
-		netIsConnect = true
 		NetState = uartTask.GISUNLINK_NETMANAGER_CONNECTED_SER 
 		uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
-		--log.warn("System","NET_STATE_UNREGISTER ---------------> 已连上平台")
-		--
 	end)    
 
 	sys.subscribe("GISUNLINK_NETMANAGER_DISCONNECTED_SER",         
 	function ()
-		netIsConnect = false
 		NetState = uartTask.GISUNLINK_NETMANAGER_DISCONNECTED_SER
 		uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
-		--log.warn("System","NET_STATE_UNREGISTER ---------------> 已断开平台")
-		--
 	end)    
 
 	sys.subscribe("GSM_SIGNAL_REPORT_IND",         
 	function (success, rssi)
 		if rssi >= 2 or rssi <= 30 then
 			uartTask.sendData(uartTask.GISUNLINK_NETWORK_RSSI,(rssi * 2) - 113);
-		else
-			if mqttTask.isReady() == false then
-				NetState = uartTask.GISUNLINK_NETMANAGER_CONNECTING
-				uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
-			else 
-				uartTask.sendData(uartTask.GISUNLINK_NETWORK_RSSI,(rssi * 2) - 113);
-			end
 		end
 	end)    
 end
 
-local function firmware_query(firmware) 
-	--GISUNLINK_NEED_UPGRADE = 0x00,   GISUNLINK_NO_NEED_UPGRADE = 0x01,    GISUNLINK_DEVICE_TIMEOUT = 0x02
-	local ret = uartTask.GISUNLINK_DEVICE_TIMEOUT
-	if not firmware or firmware == nil then return ret end
-	local rawData = {}
+local function getMSGID()
+	local time = os.time()
+	local clock = os.clock()
+	local integer,remainder = math.modf(clock);
+	remainder = tonumber(string.format("%.6f", remainder)) * 1000000
+	return ((time%100000)*10000) + remainder 
+end
 
-	--插入版本号
+local function firmware_state(state,msg) 
+	local jsonTable = {
+		id = getMSGID(), 
+		act = "status",
+		data = {			
+			success = state,
+			msg = msg
+		},
+	}	
+	mqttMsg.sendMsg("/firmware_update",json.encode(jsonTable),0)
+end
+
+local function createQueryRawData(firmware) 
+
+	local rawData = {}
+	if not firmware or firmware == nil then return rawData end
+
 	table.insert(rawData,bit.band(firmware.ver,255))
 	table.insert(rawData,bit.band(bit.rshift(firmware.ver,8),255))
 	table.insert(rawData,bit.band(bit.rshift(firmware.ver,16),255))
 	table.insert(rawData,bit.band(bit.rshift(firmware.ver,24),255))
 
-	--插入文件大小
 	table.insert(rawData,bit.band(firmware.size,255))
 	table.insert(rawData,bit.band(bit.rshift(firmware.size,8),255))
 	table.insert(rawData,bit.band(bit.rshift(firmware.size,16),255))
@@ -142,27 +154,34 @@ local function firmware_query(firmware)
 	local md5 = firmware.md5
 	if md5 and #md5 > 0 then 
 		local index = 1
-		while index <= #md5 do											--分解数据
+		while index <= #md5 do											
 			table.insert(rawData,string.byte(md5,index))
 			index = index + 1
 		end
 	end
 
-	local uartData = string.char(unpack(rawData))
+	return rawData
+end
+
+local function firmware_query(firmware) 
+	local send_num = 0;
+	local ret = uartTask.GISUNLINK_TRANSFER_FAILED
+	local uartData = string.char(unpack(createQueryRawData(firmware)))
+
+	if not firmware or firmware == nil then return ret end
 	if not uartData or uartData == nil then return ret end
 
-
-	local send_num = 0;
 	while true do 
-		log.error("firmware_query","send firmware_ver:"..firmware.ver,"md5:"..firmware.md5,"size:"..firmware.size)
 		local result = uartTask.sendData(uartTask.GISUNLINK_DEV_FW_INFO,uartData,true)
 		if result and result.send == uartTask.GISUNLINK_SEND_SUCCEED then
 			if result.data ~= nil and #result.data then 
 				local bytes = uartTask.getBytes(result.data,1)
 				local status = bytes[1]
-				ret = uartTask.GISUNLINK_NO_NEED_UPGRADE
+				ret = uartTask.GISUNLINK_DEVICE_TIMEOUT
 				if status == uartTask.GISUNLINK_NEED_UPGRADE then 
 					ret = uartTask.GISUNLINK_NEED_UPGRADE
+				elseif status == uartTask.GISUNLINK_NO_NEED_UPGRADE then 
+					ret = uartTask.GISUNLINK_NO_NEED_UPGRADE
 				end
 			end
 			break
@@ -175,47 +194,47 @@ local function firmware_query(firmware)
 		end
 	end
 
-	--如果下位机返回设备超时需要置重试标志位
 	if ret == uartTask.GISUNLINK_DEVICE_TIMEOUT then 
+		update_retry_tick = 0;
 		update_retry = true
 	else
 		update_retry = false
 	end
 
-	update_retry_tick = 0;
-	
 	log.error("firmware_query",update_retry)
 
 	return ret
 end
 
-local function firmware_transfer(offset,data) 
-	local send_succeed = false
-	if not offset then return send_succeed end
-	if not data or #data == 0 then return send_succeed end
-
+local function createTransferRawData(offset, data) 
 	local rawData = {}
 
-	--插入偏移量
 	table.insert(rawData,bit.band(offset,255))
 	table.insert(rawData,bit.band(bit.rshift(offset,8),255))
 
-	--插入数据长度
 	table.insert(rawData,bit.band(#data,255))
 	table.insert(rawData,bit.band(bit.rshift(#data,8),255))
 
 	if data and #data > 0 then 
 		local index = 1
-		while index <= #data do											--分解数据
+		while index <= #data do											
 			table.insert(rawData,string.byte(data,index))
 			index = index + 1
 		end
 	end
 
-	local uartData = string.char(unpack(rawData))
+	return rawData
+end
+
+local function firmware_transfer(offset,data) 
+	local send_num = 0;
+	local send_succeed = false
+	local uartData = string.char(unpack(createTransferRawData(offset,data)))
+
+	if not offset then return send_succeed end
+	if not data or #data == 0 then return send_succeed end
 	if not uartData or uartData == nil then return send_succeed end
 
-	local send_num = 0;
 	while true do 
 		log.error("firmware_transfer","send firmware_transfer offset:"..offset.." len:"..#data)
 		local result = uartTask.sendData(uartTask.GISUNLINK_DEV_FW_TRANS,uartData,true)
@@ -240,8 +259,9 @@ local function firmware_transfer(offset,data)
 end
 
 local function firmware_chk()
-	local ret = uartTask.GISUNLINK_DEVICE_TIMEOUT
+	local ret = uartTask.GISUNLINK_TRANSFER_FAILED
 	local send_num = 0;
+
 	while true do 
 		log.error("firmware_chk:","waiting the device check the firmware")
 		local result = uartTask.sendData(uartTask.GISUNLINK_DEV_FW_READY,nil,true)
@@ -266,23 +286,17 @@ local function firmware_chk()
 	return ret
 end
 
-function uartTransferCb(exec)
+local function uartTransferCb(exec)
 	if not exec or exec == nil then return end
 	if exec.cbfunparam then 
 		local packet = exec.cbfunparam
-
-		local time = os.time()
-		local clock = os.clock()
-		local integer,remainder = math.modf(clock);
-		remainder = tonumber(string.format("%.6f", remainder)) * 1000000
-		local pid = ((time%100000)*10000) + remainder 
 		local successString = false
 		if exec.send == uartTask.GISUNLINK_SEND_SUCCEED then 
 			successString = true
 		end
 		local jsonTable =
 		{
-			id = pid, 
+			id = getMSGID(), 
 			act = packet.act,
 			behavior = packet.behavior,
 			data = {
@@ -295,28 +309,14 @@ function uartTransferCb(exec)
 	end
 end
 
-function postSimCardInfo ()
-	sys.timerStart(function()
-		local icCID = sim.getIccid() 
-		local Imsi = sim.getImsi()
-		local clientID = "gsl_"..misc.getImei()	
-		local bodyData = "{\"flag_number\":\""..clientID.."\",\"sim_iccid\":\""..icCID.."\",\"sim_imsi\":\""..Imsi.."\"}"
-		http.request("POST","http://power.fuxiangjf.com/device/sim_info",nil,nil,bodyData,35000,nil)
-    end,500)
-end
-
-function mqttRecvMsg(packet)
+local function mqttRecvMsg(packet)
 	if not packet or packet == nil then return end
-	if packet.act == "transfer" then --正常传输命令
+	if packet.act == "transfer" then 
 		if update_hook.update == true then  
-			local time = os.time()
-			local clock = os.clock()
-			local integer,remainder = math.modf(clock);
-			remainder = tonumber(string.format("%.6f", remainder)) * 1000000
-			local pid = ((time%10000)*100000) + remainder 
+
 			local jsonTable =
 			{
-				id = pid, 
+				id = getMSGID(), 
 				act = packet.act,
 				behavior = packet.behavior,
 				data = {
@@ -340,28 +340,47 @@ function mqttRecvMsg(packet)
 			local uartData = string.char(packet.behavior,string.byte(data,1,string.len(data)))
 			uartTask.sendData(uartTask.GISUNLINK_TASK_CONTROL,uartData,true,uartTransferCb,packet);
 		end
-	elseif packet.act == "update_ver" then --升级命令
+	elseif packet.act == "update_ver" then 
 		firmware.download_new_firmware(packet.data)
-	elseif packet.act == "get_sim" then --获取sim卡信息
-		
+	elseif packet.act == "device_info" then 
+
+		local jsonTable =
+		{
+			id = getMSGID(), 
+			act = "info",
+			info = {			
+				imei = misc.getImei(),
+				version = GetFirmwareVersion(),
+				device_sn = GetDeviceHWSn(),
+				sim = {
+					ICCID = sim.getIccid(),
+					IMEI = sim.getImsi(),
+				},
+
+				cellInfo = {
+					ci = net.getCi(),
+					Lac = net.getLac(),
+					Mnc = net.getMnc(),
+					Mcc = net.getMcc(),
+					ta = net.getTa(),
+					Ext = net.getCellInfoExt(),			
+				}
+			},
+		}	
+		mqttMsg.sendMsg("/device",json.encode(jsonTable),0)	
+
 	end
 end
 
-function uartRecvMsg(packet)
+local function uartRecvMsg(packet)
 	if not packet or packet == nil then return end
---	local clientID = "gsl_"..misc.getImei()
-	--这里上传stm32发来的透传数据
 	if packet.cmd == uartTask.GISUNLINK_TASK_CONTROL then 
 		local data = packet.data
 		if not data or #data > 0 then
 			--log.error("uartRecvMsg:","data:",data:toHex(" "))
 			local behavior = string.byte(data,1) 
 			local mqtt_ack = string.byte(data,2) 
-			local time = os.time()
-			local clock = os.clock()
-			local integer,remainder = math.modf(clock);
-			remainder = tonumber(string.format("%.6f", remainder)) * 1000000
-			local pid = ((time%100000)*10000) + remainder 
+
 			local base64str = ""
 			if #data > 3 then
 				local enc_data = string.sub(data,3,-1)
@@ -370,21 +389,18 @@ function uartRecvMsg(packet)
 
 			local jsonTable =
 			{
-				id = pid, 
+				id = getMSGID(), 
 				act = "transfer",
 				behavior = behavior,
 				data = base64str,
-				ctime = time, 
+				ctime = os.time(), 
 			}
 
 			local jsonString = json.encode(jsonTable)
---			local topic = "/power_run/"..clientID
 			if mqtt_ack == uartTask.MQTT_PUBLISH_NEEDACK then
---				mqttMsg.sendMsg("/power_run/"..clientID,jsonString,2,pid)
 				mqttMsg.sendMsg("/power_run",jsonString,2,pid)
 			else
 				mqttMsg.sendMsg("/power_run",jsonString,0)
---				mqttMsg.sendMsg("/power_run/"..clientID,jsonString,0)
 			end
 		end
 	else
@@ -397,52 +413,72 @@ function uartRecvMsg(packet)
 	end
 end
 
-function wait_hw_sn() 
+local function GetDeviceHWSnOrFirmwareVersion(action, respond_size, callback)
+	local trynum = 0;
+
+	if not action or not callback then 	
+		return true
+	end
+
 	while true do 
-		log.error("waiting the device sn")
-		local result = uartTask.sendData(uartTask.GISUNLINK_HW_SN,nil,true)
+		local result = uartTask.sendData(action,nil,true)
 		if result and result.send == uartTask.GISUNLINK_SEND_SUCCEED then
-			if result.data ~= nil and #result.data == 12 then 
-				local bytes = uartTask.getBytes(result.data,12)
-				DeviceHWSn = string.format("%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", bytes[1],bytes[2],bytes[3],bytes[4],bytes[5],bytes[6],bytes[7],bytes[8],bytes[9],bytes[10],bytes[11],bytes[12])
-				log.error("device sn:"..DeviceHWSn)
+			if result.data ~= nil and #result.data >= respond_size then 
+				if callback then 
+					callback(uartTask.getBytes(result.data,respond_size))
+				end
 				break
 			end
 		else 
-			log.error("waiting the device sn:","send failed reason:"..result.reason)
+			trynum = trynum + 1		
+			log.error("GetDeviceHWSnOrFirmwareVersion:","send failed reason:"..result.reason)
 		end
+				
+		if trynum >= 5 then
+			break;
+		end
+		
+		sys.wait(200)
 	end
+	return true;
 end
 
-function system_loop()
+local function system_loop()
 	while true do	
 		if waitHWSn == false then 
-			--等设备串号
-			wait_hw_sn()
-			waitHWSn = true
+			waitHWSn = GetDeviceHWSnOrFirmwareVersion(uartTask.GISUNLINK_HW_SN,12,function(bytes)				
+				DeviceHWSn = ""				
+				for index = 1,12 do
+					DeviceHWSn = DeviceHWSn..string.format("%02x",bytes[index])
+				end					
+			end)
 		end
-		if statrsynctime == true then 
-			if ntp.isEnd() then
-			
-				--如果update_retry == true的时候，说明下位正再忙。。需要隔断时间尝试下发升级
-				if update_retry == true then 
-					update_retry_tick = update_retry_tick + 1
-					if update_retry_tick >= 60 then 											
-						update_retry_tick = 0;
-						log.error("retry send firmware",update_retry_tick);
-						--发送升级信号
-						firmware.system_start_signal()
-					end
-				end
-				log.warn("system","rssi:"..(net.getRssi() * 2) - 113 ,"heap_size:"..rtos.get_fs_free_size(),"Time:"..os.time(),"update_retry:",update_retry,"retry_tick"..update_retry_tick);
-			else
-				NetState = uartTask.GISUNLINK_NETMANAGER_TIME_FAILED
-				uartTask.sendData(uartTask.GISUNLINK_NETWORK_STATUS,NetState);
-				log.warn("system","rssi:",(net.getRssi() * 2) - 113,"heap_size:",rtos.get_fs_free_size());
+
+		if waitFirmwareVersion == false then
+			waitFirmwareVersion = GetDeviceHWSnOrFirmwareVersion(uartTask.GISUNLINK_FIRMWARE_VERSION,12,function(bytes)				
+				FirmwareVersion = ""				
+				for index = 1,12 do
+					FirmwareVersion = FirmwareVersion..string.format("%c",bytes[index])
+				end					
+			end)
+		end 	
+	
+		if socket.isReady() and statrsynctime == false then
+			statrsynctime = true;
+			ntp.setServers({"ntp.yidianting.xin","cn.ntp.org.cn","hk.ntp.org.cn","tw.ntp.org.cn"}) 
+			ntp.timeSync(24,sntpOKCb)
+		end
+
+		if update_retry == true then 
+			update_retry_tick = update_retry_tick + 1
+			if update_retry_tick >= 60 then 											
+				update_retry_tick = 0;
+				log.error("retry send firmware",update_retry_tick);
+				firmware.system_start_signal()
 			end
-		else
-			log.warn("system","rssi:",(net.getRssi() * 2) - 113,"heap_size:",rtos.get_fs_free_size());
 		end
+				
+		log.warn("system","rssi:"..(net.getRssi() * 2) - 113 ,"heap_size:"..rtos.get_fs_free_size(),"Time:"..os.time(),"update_retry:",update_retry,"retry_tick"..update_retry_tick);
 		sys.wait(1000);
 	end
 end
@@ -457,6 +493,7 @@ uartTask.regRecv(uartRecvMsg)
 update_hook.query = firmware_query 
 update_hook.transfer = firmware_transfer
 update_hook.check = firmware_chk
+update_hook.state = firmware_state
 
 firmware.updateCb(update_hook) --升级回调
 

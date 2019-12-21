@@ -55,19 +55,26 @@ function download_new_firmware(firmware)
 		download_start = true;
 	else --否则判断版本信息 
 		if last_download_task.md5 ~= firmware.md5 then 
-			if firmware.ver >= last_download_task.ver then
-				download_start = true;
-			else 
-				log.error("firmware_update","the last version >= new download_task")
-			end
+			download_start = true;
 		else
-			log.error("firmware_update","the md5 are the smae")
+		
+			if last_download_task.download_over == true then 
+				download.update_hook.state(false,"the md5 are the smae")				
+				log.error("firmware_update","the md5 are the smae")
+			elseif last_download_task.download_over == false and download.enable == true then
+				download.update_hook.state(false,"wait the"..firmware.md5.." download finished")
+				log.error("firmware_update","wait the "..firmware.md5.." download finished")
+			elseif last_download_task.download_over == false and download.enable == false then
+				download.update_hook.state(false,"restart download the "..firmware.md5)
+				log.error("firmware_update","restart download the "..firmware.md5)	
+				download_start = true
+			end			
 		end
 	end
 
 	if download_start == true then 
-		local new_download_task = firmware	
-		new_download_task.download_over = false
+		firmware.download_over = false
+		local new_download_task = firmware
 		nvm.set("download_task",new_download_task)
 		log.error("firmware_update","has come a new version")
 		--只有没开始下载的时候才对download赋值
@@ -84,15 +91,17 @@ end
 
 local function downloadfirmware(firmware)
 	local download_path = nil
-	if not firmware or not firmware.url or not firmware.md5 then log.error("downloadfirmware","exit download task") return end
+	if not firmware or not firmware.url or not firmware.md5 then log.error("downloadfirmware","exit download task") return end	
 	local download_num = 0;
 	local fileSize = 0;
+	
+	download.update_hook.state(true,"start download firmware file")			
 	while true do
 		os.remove(UPD_FILE_PATH)
 		if firmware.size >= rtos.get_fs_free_size() then break end;
 		fileSize = 0;
-		download_path = nil;
-		http.request("GET",firmware.url,nil,nil,nil,60000,function (respond,statusCode,head,filePath) 
+		download_path = nil;		
+		http.request("GET",firmware.url,nil,nil,nil,8000,function (respond,statusCode,head,filePath) 
 			sys.publish("UPDATE_DOWNLOAD",respond,statusCode,head,filePath)
 		end,UPD_FILE_PATH)
 
@@ -103,18 +112,28 @@ local function downloadfirmware(firmware)
 				fileSize = io.fileSize(UPD_FILE_PATH)
 				if fileSize == firmware.size then 
 					download_path = UPD_FILE_PATH					
+					download.update_hook.state(true,"download finish")				
 					log.error("firmware_update","download finish")
 					break
 				else 
+					download.update_hook.state(false,"download error the size not the same,dsize:"..fileSize.."size:"..firmware.size)				
 					log.error("firmware_update","download error the size not the same","dsize:"..fileSize.."size:"..firmware.size)
 				end
+			end
+			
+			if statusCode == "404" then
+				download.update_hook.state(false,"http request respond code 404")
+				log.error("firmware_update","http request respond code 404")
+				break
 			end
 		else 
 			download_num = download_num + 1
 			if download_num == 3 then
+				download.update_hook.state(false,"download timeout retry num > 3")				
 				log.error("firmware_update","download_num > 3")
 				break
 			else
+				download.update_hook.state(false,"download timeout retry again")				
 				log.error("downloadfirmware","download retry")
 			end
 		end
@@ -151,19 +170,24 @@ local function chk_md5(filePath,md5)
 end
 
 local function new_firmware_download_proc(update_ctr)
+	local download_ok = false
 	while update_ctr.enable == true do
 		local filePath,fileSize =  downloadfirmware(update_ctr.firmware)
 		local chk_md5_ok = false 
-
+		
 		if filePath and fileSize == update_ctr.firmware.size then
 			if chk_md5(filePath,update_ctr.firmware.md5) == true then 
 				chk_md5_ok = true
 			end
+		else
+			download.update_hook.state(false,"download failed")
+			log.error("firmware_update","download failed!")
 		end 
 
 		--检查是否有新的下载任务进来
 		local new_download_task = nvm.get("download_task")
 		if new_download_task.md5 == update_ctr.firmware.md5 then
+			local task = update_ctr.firmware
 			--检查md5校验是否成功
 			if chk_md5_ok then
 				os.remove(FW_FILE_PATH)
@@ -176,9 +200,11 @@ local function new_firmware_download_proc(update_ctr)
 				firmware.transfer_over = false
 				log.error("new_firmware_download_proc","save firmware info")
 				nvm.set("firmware",firmware)
+				task.download_over = true
+				download_ok = true
+			else 
+				task.download_over = false
 			end
-			local task = update_ctr.firmware
-			task.download_over = true
 			log.error("exit download and save download_task")
 			nvm.set("download_task",task)
 			--退出下载
@@ -189,6 +215,7 @@ local function new_firmware_download_proc(update_ctr)
 			log.error("firmware_update","break current download task, because has a new version come in")
 		end
 	end
+	return download_ok
 end
 
 local function download_check(last_task)
@@ -240,26 +267,33 @@ local function firmware_update(update_hook)
 	else
 		log.error("check local firmware file::","firmware:"..firmware.path," md5:"..firmware.md5," size:"..firmware.size)
 		if update_hook and update_hook.query and update_hook.transfer and update_hook.check then 
+			update_hook.state(true,"send firmware update query")
 			local transfer_over = false
 			local clean_version = false
-			--GISUNLINK_NEED_UPGRADE = 0x00,   GISUNLINK_NO_NEED_UPGRADE = 0x01,    GISUNLINK_DEVICE_TIMEOUT = 0x02
 			local transfer = update_hook.query(firmware);
-			if transfer == uartTask.GISUNLINK_NO_NEED_UPGRADE then 
+			if transfer == uartTask.GISUNLINK_DEVICE_TIMEOUT then
+				log.error("local firmware file:","device is buys")
+				update_hook.state(false,"device is buys")
+			elseif transfer == uartTask.GISUNLINK_NO_NEED_UPGRADE then 
 				clean_version = true;
 				log.error("local firmware file:","device no need to update firmware")
-			elseif transfer == uartTask.GISUNLINK_DEVICE_TIMEOUT then
+				update_hook.state(false,"device no need to update firmware")
+			elseif transfer == uartTask.GISUNLINK_TRANSFER_FAILED then
 				log.error("local firmware file:","device is off-line")
+				update_hook.state(false,"device is off-line")
 			elseif transfer == uartTask.GISUNLINK_NEED_UPGRADE then
 				update_hook.update = true
 				update_hook.version = firmware.ver
 				update_hook.send_size = 0
-				update_hook.file_size = firmware.size
+				update_hook.file_size = firmware.size				
+				update_hook.state(true,"start send firmware data to device")
 				if send_firmwareData_to_device(firmware.path,update_hook) == firmware.size then
 					transfer_over = true
 				end
 			end
 
 			if transfer_over == true then 
+				update_hook.state(true,"firmware transfer finish")
 				log.error("local firmware file:","firmware transfer finish")
 				local ret = update_hook.check();
 
@@ -267,11 +301,14 @@ local function firmware_update(update_hook)
 					clean_version = true
 				elseif ret == uartTask.GISUNLINK_DEVICE_TIMEOUT then 
 					log.error("local firmware file:","device is off-line")
+					update_hook.state(false,"device is off-line")
 				elseif ret == uartTask.GISUNLINK_FIRMWARE_CHK_NO_OK then
 					clean_version = false
 					log.error("local firmware file:","device check data error!")
+					update_hook.state(false,"device check data error!")
 				end
 			else 
+				update_hook.state(false,"firmware transfer unfinished")
 				log.error("local firmware file:","firmware transfer unfinished")
 			end
 
@@ -280,6 +317,7 @@ local function firmware_update(update_hook)
 				firmware.transfer_over = true
 				nvm.set("firmware",firmware)
 				if transfer_over == true then
+					update_hook.state(true,"device succeed receive data!")				
 					log.error("local firmware file","device succeed receive data!")
 				end
 			end
@@ -293,10 +331,13 @@ end
 
 local function updateFirmware_Proc(update_ctr)
 	while true do	
-		local result = sys.waitUntil("updateFirmware_working") 
+		local result = sys.waitUntil("updateFirmware_working")
 		if result == true then
 			while true do 
-				new_firmware_download_proc(update_ctr)
+				local download_ok =	new_firmware_download_proc(update_ctr)
+				if download_ok == false then
+					break;
+				end
 				local last_download_task = nvm.get("download_task")
 				if download_check(last_download_task) then
 					break;

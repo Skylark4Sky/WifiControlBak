@@ -95,6 +95,9 @@ GISUNLINK_TASK_CONTROL = 0x0C
 --获取设备SN号
 GISUNLINK_HW_SN = 0x0D
 
+--获取设备版本号
+GISUNLINK_FIRMWARE_VERSION = 0x0E
+
 --发送成功
 GISUNLINK_SEND_SUCCEED = true
 --发送超时
@@ -201,6 +204,7 @@ local function checkPackeeCmd(cmd)
 	if cmd == GISUNLINK_DEV_SN then return true end 
 	if cmd == GISUNLINK_TASK_CONTROL then return true end 
 	if cmd == GISUNLINK_HW_SN then return true end 
+	if cmd == GISUNLINK_FIRMWARE_VERSION then return true end 
 	return false
 end
 

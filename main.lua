@@ -8,8 +8,10 @@
 --必须在这个位置定义PROJECT和VERSION变量
 --PROJECT：ascii string类型，可以随便定义，只要不使用,就行
 --VERSION：ascii string类型，如果使用Luat物联云平台固件升级的功能，必须按照"X.X.X"定义，X表示1位数字；否则可随便定义
-PROJECT = "MQTT"
-VERSION = "2.0.0"
+PROJECT = "CHARGING"
+VERSION = "1.0.2"
+
+require "update"
 
 --加载日志功能模块，并且设置日志输出等级
 --如果关闭调用log模块接口输出的日志，等级设置为log.LOG_SILENT即可
@@ -27,8 +29,8 @@ require "sys"
 require "net"
 
 --每1分钟查询一次GSM信号强度
---每1分钟查询一次基站信息
-net.startQueryAll(10000, 10000)
+--每10分钟查询一次基站信息
+net.startQueryAll(10000, 100000)
 
 --加载控制台调试功能模块（此处代码配置的是uart1，波特率115200）
 --此功能模块不是必须的，根据项目需求决定是否加载
@@ -58,9 +60,10 @@ errDump.request("udp://ota.airm2m.com:9072")
 
 --加载远程升级功能模块【强烈建议打开此功能】
 --如下3行代码，只是简单的演示如何使用update功能，详情参考update的api以及demo/update
---PRODUCT_KEY = "v32xEAKsGTIEQxtqgwCldp5aPlcnPs3K"
---require "update"
---update.request()
+PRODUCT_KEY = "4ldFGX1WBRj17cEUSSCPBCIMtZVk7Fi6"
+require "update"
+update.request()
+
 --加载串口模块
 require "uartTask"
 --加载MQTT功能测试模块
