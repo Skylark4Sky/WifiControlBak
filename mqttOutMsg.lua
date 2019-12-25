@@ -62,13 +62,13 @@ end
 -- @param mqttClient，MQTT客户端对象
 -- @return 处理成功返回true，处理出错返回false
 -- @usage mqttOutMsg.proc(mqttClient)
-function proc(mqttClient,topic_flag)
+function proc(mqttClient)
     while #msgQuene>0 do
         local outMsg = table.remove(msgQuene,1)
 		local topic = outMsg.t
-		if outMsg.t  == "/power_run" then topic = outMsg.t.."/"..topic_flag end
-		if outMsg.t  == "/firmware_update" then topic = outMsg.t.."/"..topic_flag end	
-		if outMsg.t  == "/device" then topic = outMsg.t.."/"..topic_flag end			
+--		if outMsg.t  == "/power_run" then topic = outMsg.t.."/"..topic_flag end
+--		if outMsg.t  == "/firmware_update" then topic = outMsg.t.."/"..topic_flag end	
+--		if outMsg.t  == "/device" then topic = outMsg.t.."/"..topic_flag end			
         local result = mqttClient:publish(topic,outMsg.p,outMsg.q)
 		log.error("MqttSendMsg:","Topic:"..topic.."  Qos:"..outMsg.q)
         if outMsg.user and outMsg.user.cb then outMsg.user.cb(result,outMsg.user.para) end

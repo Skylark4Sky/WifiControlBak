@@ -16,6 +16,11 @@ local Queue = {} --发送队列
 local WaitAckQueue = {} --等待服务器回复队列
 local callback = {}
 
+--获取设备信息
+GISUNLINK_GET_DEVICE_INFO = 0x00 
+--提交设备信息
+GISUNLINK_POST_DEVICE_INFO = 0x01 
+
 function regRecv(cbfun)
 	if cbfun then 
 		callback = cbfun 

@@ -24,14 +24,14 @@ local waitFirmwareVersion = false
 local FirmwareVersion = "unkown"
 
 local statrsynctime = false
-
 local update_retry = false
+
 local update_retry_tick = 0
 local update_hook = {update = false,version = 0,file_size = 0,send_size = 0}
 
 local sim_registered = false
-
 local NetState = uartTask.GISUNLINK_NETMANAGER_IDLE 
+local TopicString = "/device_state/"..DeviceHWSn
 
 function isSimRegistered() 
 	return sim_registered
@@ -124,16 +124,16 @@ local function getMSGID()
 	return ((time%100000)*10000) + remainder 
 end
 
-local function firmware_state(state,msg) 
+local function postFirmwareUptdateState(behavior,msg) 
 	local jsonTable = {
 		id = getMSGID(), 
-		act = "status",
+		act = "firmware_update",
+		behavior = behavior,
 		data = {			
-			success = state,
 			msg = msg
 		},
 	}	
-	mqttMsg.sendMsg("/firmware_update",json.encode(jsonTable),0)
+	mqttMsg.sendMsg(TopicString,json.encode(jsonTable),0)
 end
 
 local function createQueryRawData(firmware) 
@@ -305,7 +305,7 @@ local function uartTransferCb(exec)
 				msg = exec.reason
 			},
 		}
-		mqttMsg.sendMsg("/point_switch_resp",json.encode(jsonTable),0)
+		mqttMsg.sendMsg(TopicString,json.encode(jsonTable),0)
 	end
 end
 
@@ -322,10 +322,10 @@ local function mqttRecvMsg(packet)
 				data = {
 					req_id = packet.id,
 					success = false,
-					msg = "system upgrade! ver:"..update_hook.version.." file_size:"..update_hook.file_size.." progress_size:"..update_hook.send_size
+					msg = "system busy!"
 				},
 			}
-			mqttMsg.sendMsg("/point_switch_resp",json.encode(jsonTable),0)
+			mqttMsg.sendMsg(TopicString,json.encode(jsonTable),0)
 			return;
 		end
 		local data = crypto.base64_decode(packet.data,string.len(packet.data))
@@ -342,12 +342,13 @@ local function mqttRecvMsg(packet)
 		end
 	elseif packet.act == "update_ver" then 
 		firmware.download_new_firmware(packet.data)
-	elseif packet.act == "device_info" then 
+	elseif packet.act == "device_info" and packet.behavior == GISUNLINK_GET_DEVICE_INFO then 
 
 		local jsonTable =
 		{
 			id = getMSGID(), 
-			act = "info",
+			act = "device_info",
+			behavior = GISUNLINK_POST_DEVICE_INFO,
 			info = {			
 				imei = misc.getImei(),
 				version = GetFirmwareVersion(),
@@ -367,8 +368,7 @@ local function mqttRecvMsg(packet)
 				}
 			},
 		}	
-		mqttMsg.sendMsg("/device",json.encode(jsonTable),0)	
-
+		mqttMsg.sendMsg(TopicString,json.encode(jsonTable),0)	
 	end
 end
 
@@ -398,9 +398,9 @@ local function uartRecvMsg(packet)
 
 			local jsonString = json.encode(jsonTable)
 			if mqtt_ack == uartTask.MQTT_PUBLISH_NEEDACK then
-				mqttMsg.sendMsg("/power_run",jsonString,2,pid)
+				mqttMsg.sendMsg(TopicString,jsonString,2,pid)
 			else
-				mqttMsg.sendMsg("/power_run",jsonString,0)
+				mqttMsg.sendMsg(TopicString,jsonString,0)
 			end
 		end
 	else
@@ -451,6 +451,7 @@ local function system_loop()
 				for index = 1,12 do
 					DeviceHWSn = DeviceHWSn..string.format("%02x",bytes[index])
 				end					
+				TopicString = "/device_state/"..DeviceHWSn
 			end)
 		end
 
@@ -493,7 +494,7 @@ uartTask.regRecv(uartRecvMsg)
 update_hook.query = firmware_query 
 update_hook.transfer = firmware_transfer
 update_hook.check = firmware_chk
-update_hook.state = firmware_state
+update_hook.stateCb = postFirmwareUptdateState 
 
 firmware.updateCb(update_hook) --升级回调
 

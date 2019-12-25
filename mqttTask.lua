@@ -91,7 +91,7 @@ local function ConnectToSrv()
 			--循环处理接收和发送的数据
 			while true do
 				if not mqttInMsg.proc(mqttClient) then log.error("mqttTask.mqttInMsg.proc error") break end
-				if not mqttOutMsg.proc(mqttClient,system.GetDeviceHWSn()) then log.error("mqttTask.mqttOutMsg proc error") break end
+				if not mqttOutMsg.proc(mqttClient) then log.error("mqttTask.mqttOutMsg proc error") break end
 			end
 			mqttOutMsg.unInit()
 		end
