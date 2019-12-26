@@ -35,7 +35,6 @@ function insertQueue(topic,payload)
 	sys.publish("mqttMsgQueue_working")
 end
 
-
 function SendRespondCb(result,publish_id)
 	local resp_id = publish_id
 		for k, v in ipairs(WaitAckQueue) do 
