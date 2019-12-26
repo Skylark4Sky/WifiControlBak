@@ -132,6 +132,7 @@ local function postFirmwareUptdateState(behavior,msg)
 		data = {			
 			msg = msg
 		},
+		ctime = os.time(), 
 	}	
 	mqttMsg.sendMsg(TopicString,json.encode(jsonTable),0)
 end
@@ -304,6 +305,7 @@ local function uartTransferCb(exec)
 				success = successString,
 				msg = exec.reason
 			},
+			ctime = os.time(), 
 		}
 		mqttMsg.sendMsg(TopicString,json.encode(jsonTable),0)
 	end
@@ -324,6 +326,7 @@ local function mqttRecvMsg(packet)
 					success = false,
 					msg = "system busy!"
 				},
+				ctime = os.time(), 
 			}
 			mqttMsg.sendMsg(TopicString,json.encode(jsonTable),0)
 			return;
@@ -367,6 +370,7 @@ local function mqttRecvMsg(packet)
 					Ext = net.getCellInfoExt(),			
 				}
 			},
+			ctime = os.time(), 
 		}	
 		mqttMsg.sendMsg(TopicString,json.encode(jsonTable),0)	
 	end
