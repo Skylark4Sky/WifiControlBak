@@ -21,6 +21,11 @@ GISUNLINK_GET_DEVICE_INFO = 0x00
 --提交设备信息
 GISUNLINK_POST_DEVICE_INFO = 0x01 
 
+--通信结果
+GISUNLINK_UART_TRANSFER_RESULT = "transfer_result"
+--默认行为
+GISUNLINK_DEFAULT_BEHAVIOR = 0x00
+
 function regRecv(cbfun)
 	if cbfun then 
 		callback = cbfun 

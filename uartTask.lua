@@ -497,7 +497,6 @@ local function recvQueueProc()
 				end
 			--回复包
 			elseif packet and packet.dir == 0x01 then
---				log.error("recvQueueProc:","PacketID:"..packet.id)
 				for k, v in ipairs(waitQueue) do 
 					local waitPacket = v
 					if waitPacket.id == packet.id and waitPacket.wb_del == false then
@@ -567,7 +566,7 @@ local function waitQueueOpt(Queue,key,value,hash_del)
 	local packet = value
 	if packet and type(packet) == "table" then 
 		local curTime = os.clock()
-		local diff_value = 300 --实际为0.2 乘1000为了消除工具提示错误
+		local diff_value = 300 --实际为0.3 乘1000为了消除工具提示错误
 		if ((curTime - packet.startTime) * 1000) >= diff_value and packet.wb_del == false then  
 			--如果重试次数未用完则再次发一次数据
 			if packet.retry > 0 then 

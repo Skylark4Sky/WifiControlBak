@@ -297,8 +297,8 @@ local function uartTransferCb(exec)
 		local jsonTable =
 		{
 			id = getMSGID(), 
-			act = packet.act,
-			behavior = packet.behavior,
+			act = GISUNLINK_UART_TRANSFER_RESULT,
+			behavior = GISUNLINK_DEFAULT_BEHAVIOR,
 			data = {
 				req_id = packet.id,
 				success = successString,
@@ -317,8 +317,8 @@ local function mqttRecvMsg(packet)
 			local jsonTable =
 			{
 				id = getMSGID(), 
-				act = packet.act,
-				behavior = packet.behavior,
+				act = GISUNLINK_UART_TRANSFER_RESULT,
+				behavior = GISUNLINK_DEFAULT_BEHAVIOR,
 				data = {
 					req_id = packet.id,
 					success = false,
@@ -433,11 +433,11 @@ local function GetDeviceHWSnOrFirmwareVersion(action, respond_size, callback)
 			trynum = trynum + 1		
 			log.error("GetDeviceHWSnOrFirmwareVersion:","send failed reason:"..result.reason)
 		end
-				
+
 		if trynum >= 5 then
 			break;
 		end
-		
+
 		sys.wait(200)
 	end
 	return true;
@@ -463,7 +463,7 @@ local function system_loop()
 				end					
 			end)
 		end 	
-	
+
 		if socket.isReady() and statrsynctime == false then
 			statrsynctime = true;
 			ntp.setServers({"ntp.yidianting.xin","cn.ntp.org.cn","hk.ntp.org.cn","tw.ntp.org.cn"}) 
@@ -478,7 +478,7 @@ local function system_loop()
 				firmware.system_start_signal()
 			end
 		end
-				
+
 		log.warn("system","rssi:"..(net.getRssi() * 2) - 113 ,"heap_size:"..rtos.get_fs_free_size(),"Time:"..os.time(),"update_retry:",update_retry,"retry_tick"..update_retry_tick);
 		sys.wait(1000);
 	end
