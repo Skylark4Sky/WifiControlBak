@@ -16,16 +16,6 @@ local Queue = {} --发送队列
 local WaitAckQueue = {} --等待服务器回复队列
 local callback = {}
 
---获取设备信息
-GISUNLINK_GET_DEVICE_INFO = 0x00 
---提交设备信息
-GISUNLINK_POST_DEVICE_INFO = 0x01 
-
---通信结果
-GISUNLINK_UART_TRANSFER_RESULT = "transfer_result"
---默认行为
-GISUNLINK_DEFAULT_BEHAVIOR = 0x00
-
 function regRecv(cbfun)
 	if cbfun then 
 		callback = cbfun 
@@ -39,6 +29,7 @@ function insertQueue(topic,payload)
 	table.insert(Queue, item)
 	sys.publish("mqttMsgQueue_working")
 end
+
 
 function SendRespondCb(result,publish_id)
 	local resp_id = publish_id

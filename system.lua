@@ -24,14 +24,14 @@ local waitFirmwareVersion = false
 local FirmwareVersion = "unkown"
 
 local statrsynctime = false
-local update_retry = false
 
+local update_retry = false
 local update_retry_tick = 0
 local update_hook = {update = false,version = 0,file_size = 0,send_size = 0}
 
 local sim_registered = false
+
 local NetState = uartTask.GISUNLINK_NETMANAGER_IDLE 
-local TopicString = "/device_state/"..DeviceHWSn
 
 function isSimRegistered() 
 	return sim_registered
@@ -124,17 +124,16 @@ local function getMSGID()
 	return ((time%100000)*10000) + remainder 
 end
 
-local function postFirmwareUptdateState(behavior,msg) 
+local function firmware_state(state,msg) 
 	local jsonTable = {
 		id = getMSGID(), 
-		act = "firmware_update",
-		behavior = behavior,
+		act = "status",
 		data = {			
+			success = state,
 			msg = msg
 		},
-		ctime = os.time(), 
 	}	
-	mqttMsg.sendMsg(TopicString,json.encode(jsonTable),0)
+	mqttMsg.sendMsg("/firmware_update",json.encode(jsonTable),0)
 end
 
 local function createQueryRawData(firmware) 
@@ -298,16 +297,15 @@ local function uartTransferCb(exec)
 		local jsonTable =
 		{
 			id = getMSGID(), 
-			act = GISUNLINK_UART_TRANSFER_RESULT,
-			behavior = GISUNLINK_DEFAULT_BEHAVIOR,
+			act = packet.act,
+			behavior = packet.behavior,
 			data = {
 				req_id = packet.id,
 				success = successString,
 				msg = exec.reason
 			},
-			ctime = os.time(), 
 		}
-		mqttMsg.sendMsg(TopicString,json.encode(jsonTable),0)
+		mqttMsg.sendMsg("/point_switch_resp",json.encode(jsonTable),0)
 	end
 end
 
@@ -319,16 +317,15 @@ local function mqttRecvMsg(packet)
 			local jsonTable =
 			{
 				id = getMSGID(), 
-				act = GISUNLINK_UART_TRANSFER_RESULT,
-				behavior = GISUNLINK_DEFAULT_BEHAVIOR,
+				act = packet.act,
+				behavior = packet.behavior,
 				data = {
 					req_id = packet.id,
 					success = false,
-					msg = "system busy!"
+					msg = "system upgrade! ver:"..update_hook.version.." file_size:"..update_hook.file_size.." progress_size:"..update_hook.send_size
 				},
-				ctime = os.time(), 
 			}
-			mqttMsg.sendMsg(TopicString,json.encode(jsonTable),0)
+			mqttMsg.sendMsg("/point_switch_resp",json.encode(jsonTable),0)
 			return;
 		end
 		local data = crypto.base64_decode(packet.data,string.len(packet.data))
@@ -345,13 +342,12 @@ local function mqttRecvMsg(packet)
 		end
 	elseif packet.act == "update_ver" then 
 		firmware.download_new_firmware(packet.data)
-	elseif packet.act == "device_info" and packet.behavior == GISUNLINK_GET_DEVICE_INFO then 
+	elseif packet.act == "device_info" then 
 
 		local jsonTable =
 		{
 			id = getMSGID(), 
-			act = "device_info",
-			behavior = GISUNLINK_POST_DEVICE_INFO,
+			act = "info",
 			info = {			
 				imei = misc.getImei(),
 				version = GetFirmwareVersion(),
@@ -370,9 +366,9 @@ local function mqttRecvMsg(packet)
 					Ext = net.getCellInfoExt(),			
 				}
 			},
-			ctime = os.time(), 
 		}	
-		mqttMsg.sendMsg(TopicString,json.encode(jsonTable),0)	
+		mqttMsg.sendMsg("/device",json.encode(jsonTable),0)	
+
 	end
 end
 
@@ -402,9 +398,9 @@ local function uartRecvMsg(packet)
 
 			local jsonString = json.encode(jsonTable)
 			if mqtt_ack == uartTask.MQTT_PUBLISH_NEEDACK then
-				mqttMsg.sendMsg(TopicString,jsonString,2,pid)
+				mqttMsg.sendMsg("/power_run",jsonString,2,pid)
 			else
-				mqttMsg.sendMsg(TopicString,jsonString,0)
+				mqttMsg.sendMsg("/power_run",jsonString,0)
 			end
 		end
 	else
@@ -437,11 +433,11 @@ local function GetDeviceHWSnOrFirmwareVersion(action, respond_size, callback)
 			trynum = trynum + 1		
 			log.error("GetDeviceHWSnOrFirmwareVersion:","send failed reason:"..result.reason)
 		end
-
+				
 		if trynum >= 5 then
 			break;
 		end
-
+		
 		sys.wait(200)
 	end
 	return true;
@@ -455,7 +451,6 @@ local function system_loop()
 				for index = 1,12 do
 					DeviceHWSn = DeviceHWSn..string.format("%02x",bytes[index])
 				end					
-				TopicString = "/device_state/"..DeviceHWSn
 			end)
 		end
 
@@ -467,7 +462,7 @@ local function system_loop()
 				end					
 			end)
 		end 	
-
+	
 		if socket.isReady() and statrsynctime == false then
 			statrsynctime = true;
 			ntp.setServers({"ntp.yidianting.xin","cn.ntp.org.cn","hk.ntp.org.cn","tw.ntp.org.cn"}) 
@@ -482,7 +477,7 @@ local function system_loop()
 				firmware.system_start_signal()
 			end
 		end
-
+				
 		log.warn("system","rssi:"..(net.getRssi() * 2) - 113 ,"heap_size:"..rtos.get_fs_free_size(),"Time:"..os.time(),"update_retry:",update_retry,"retry_tick"..update_retry_tick);
 		sys.wait(1000);
 	end
@@ -498,7 +493,7 @@ uartTask.regRecv(uartRecvMsg)
 update_hook.query = firmware_query 
 update_hook.transfer = firmware_transfer
 update_hook.check = firmware_chk
-update_hook.stateCb = postFirmwareUptdateState 
+update_hook.state = firmware_state
 
 firmware.updateCb(update_hook) --升级回调
 
