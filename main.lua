@@ -9,7 +9,7 @@
 --PROJECT：ascii string类型，可以随便定义，只要不使用,就行
 --VERSION：ascii string类型，如果使用Luat物联云平台固件升级的功能，必须按照"X.X.X"定义，X表示1位数字；否则可随便定义
 PROJECT = "CHARGING"
-VERSION = "1.0.3"
+VERSION = "1.0.10"
 
 require "update"
 
@@ -56,7 +56,7 @@ netLed.setup(true,pio.P0_33)
 --加载错误日志管理功能模块【强烈建议打开此功能】
 --如下2行代码，只是简单的演示如何使用errDump功能，详情参考errDump的api
 require "errDump"
-errDump.request("udp://ota.airm2m.com:9072")
+errDump.request("udp://ota.airm2m.com:9072",3600*1000)
 
 --加载远程升级功能模块【强烈建议打开此功能】
 --如下3行代码，只是简单的演示如何使用update功能，详情参考update的api以及demo/update

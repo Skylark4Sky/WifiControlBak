@@ -44,14 +44,16 @@ function getMqttSrvInfo()
 	local server = nil 
 	local Version = system.GetFirmwareVersion()
 	local DeviceHWSn = system.GetDeviceHWSn()
-
+	local requestConut = 0
+	local errorString = "noError"
 	local clientID = "gsl_"..misc.getImei()
-	local bodyData = "{\"flag_number\":\""..clientID.."\",\"version\":\""..Version.."\",\"device_sn\":\""..DeviceHWSn.."\",\"ICCID\":\""..sim.getIccid().."\",\"IMEI\":\""..sim.getImsi().."\"}"
+	local bodyData = "{\"flag_number\":\""..clientID.."\",\"version\":\""..Version.."\",\"device_sn\":\""..DeviceHWSn.."\",\"ICCID\":\""..sim.getIccid().."\",\"IMEI\":\""..sim.getImsi().."\"}"		
 	log.error("getMqttSrvInfo:","PostData:"..bodyData)
 	
-	while true do
+	while true do		
 		sys.publish("GISUNLINK_NETMANAGER_CONNECTING")
-		http.request("POST","http://power.fuxiangjf.com/device/mqtt_connect_info",nil,nil,bodyData,8000,
+		local urlHost = "http://power.fuxiangjf.com/device/mqtt_connect_info?"..clientID.."&timeStamp"..os.time().."&requestCount="..requestConut.."&errorString="..errorString
+		http.request("POST",urlHost,nil,nil,bodyData,35000,
 	    function (respond,statusCode,head,body)
 			sys.publish("GET_SRV_INFO_OF",respond,statusCode,body)
 		end)
@@ -61,9 +63,16 @@ function getMqttSrvInfo()
 		if result and statusCode == "200" then
 			server = procRespond(body)
 			if server ~= nil and server.code == 20000 then
+				requestConut = 0
+				errorString = "noError"
 				break;
-			end
+			else
+				errorString = "jsonError"
+			end 
+		else
+			errorString = "statusCode"..statusCode
 		end
+		requestConut = requestConut + 1
 		sys.wait(1000);
 	end
 
