@@ -311,23 +311,24 @@ end
 
 local function mqttRecvMsg(packet)
 	if not packet or packet == nil then return end
-	if packet.act == "transfer" then 
-		if update_hook.update == true then  
 
-			local jsonTable =
-			{
-				id = getMSGID(), 
-				act = packet.act,
-				behavior = packet.behavior,
-				data = {
-					req_id = packet.id,
-					success = false,
-					msg = "system upgrade! ver:"..update_hook.version.." file_size:"..update_hook.file_size.." progress_size:"..update_hook.send_size
-				},
-			}
-			mqttMsg.sendMsg("/point_switch_resp",json.encode(jsonTable),0)
-			return;
-		end
+	if update_hook.update == true then  
+		local jsonTable =
+		{
+			id = getMSGID(), 
+			act = packet.act,
+			behavior = packet.behavior,
+			data = {
+				req_id = packet.id,
+				success = false,
+				msg = "system upgrade! ver:"..update_hook.version.." file_size:"..update_hook.file_size.." progress_size:"..update_hook.send_size
+			},
+		}
+		mqttMsg.sendMsg("/point_switch_resp",json.encode(jsonTable),0)
+		return;
+	end
+
+	if packet.act == "transfer" then 
 		local data = crypto.base64_decode(packet.data,string.len(packet.data))
 
 		if not data or #data <= 0 then
@@ -433,11 +434,11 @@ local function GetDeviceHWSnOrFirmwareVersion(action, respond_size, callback)
 			trynum = trynum + 1		
 			log.error("GetDeviceHWSnOrFirmwareVersion:","send failed reason:"..result.reason)
 		end
-				
+
 		if trynum >= 5 then
 			break;
 		end
-		
+
 		sys.wait(200)
 	end
 	return true;
@@ -462,7 +463,7 @@ local function system_loop()
 				end					
 			end)
 		end 	
-	
+
 		if socket.isReady() and statrsynctime == false then
 			statrsynctime = true;
 			ntp.setServers({"ntp.yidianting.xin","cn.ntp.org.cn","hk.ntp.org.cn","tw.ntp.org.cn"}) 
@@ -477,7 +478,7 @@ local function system_loop()
 				firmware.system_start_signal()
 			end
 		end
-				
+
 		log.warn("system","rssi:"..(net.getRssi() * 2) - 113 ,"heap_size:"..rtos.get_fs_free_size(),"Time:"..os.time(),"update_retry:",update_retry,"retry_tick"..update_retry_tick);
 		sys.wait(1000);
 	end
