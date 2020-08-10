@@ -410,7 +410,8 @@ local function uartRecvMsg(packet)
 		elseif packet.cmd == uartTask.GISUNLINK_DEV_SN then
 			local DEV_SN = misc.getImei()
 			uartTask.sendData(uartTask.GISUNLINK_DEV_SN,DEV_SN);
-		elseif packe.cmd = uartTask.GISUNLINK_RESET_NET_MODULE then
+		elseif packet.cmd == uartTask.GISUNLINK_RESET_NET_MODULE then
+			log.error("GISUNLINK_RESET_NET_MODULE:")
 			rtos.restart()
 		end
 	end
