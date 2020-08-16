@@ -73,7 +73,7 @@ function getMqttSrvInfo()
 			errorString = "statusCode"..statusCode
 		end
 		requestConut = requestConut + 1
-		sys.wait(1000);
+		sys.wait(10000);
 	end
 
 	log.error("getMqttSrvInfo:","code:"..server.code.." host:"..server.info["mqtt_host"].." port:"..server.info["mqtt_port"].." user:"..server.info["username"].." password:"..server.info["password"])
