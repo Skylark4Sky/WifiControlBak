@@ -82,18 +82,18 @@ end
 
 function RegistereDevice()
 	local server = nil 
-	local Version = system.GetFirmwareVersion()
-	local DeviceHWSn = system.GetDeviceHWSn()
+	local Device_version = system.GetFirmwareVersion()
+	local Device_sn = system.GetDeviceHWSn()
 
 	local token = crypto.aes_encrypt("CBC","ZERO",misc.getImei(),"78hrey23y28ogs89","1234567890123456")
 	local heads = {}
 	
 	heads["User-Agent"] = "gisunLink_iot"
-	heads["Content-Type"] = "application/json"
+	heads["Content-Type"] = "application/json" 
 	
-	local bodyData = "{\"type\":1,\"deviceNo\":\""..DeviceHWSn.."\",\"token\":\""..string.toHex(token).."\",\"version\":\""..Version.."\"}"		
+	local bodyData = "{\"type\":1,\"module_sn\":\""..misc.getImei().."\",\"module_version\":\"".._G.PROJECT.."_".._G.VERSION.."\",\"device_sn\":\""..Device_sn.."\",\"device_version\":\""..Device_version.."\",\"token\":\""..string.toHex(token).."\"}"		
 	while true do		
-		local urlHost = "http://iot.gisunlink.com/api/device?clientID="..misc.getImei().."&module_version=".._G.PROJECT.."_".._G.VERSION
+		local urlHost = "http://iot.gisunlink.com/api/device"
 		log.error("RegistereDevice:","URL"..urlHost)
 		log.error("RegistereDevice:","PostData:"..bodyData)
 		http.request("POST",urlHost,nil,heads,bodyData,15000,
