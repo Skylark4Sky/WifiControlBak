@@ -80,6 +80,34 @@ function getMqttSrvInfo()
 	return server.info;
 end
 
+local function RegistereDevice()
+	local server = nil 
+	local Version = system.GetFirmwareVersion()
+	local DeviceHWSn = system.GetDeviceHWSn()
+
+	local token = crypto.aes_encrypt("CBC","ZERO",misc.getImei(),"78hrey23y28ogs89","1234567890123456")
+
+	local bodyData = "{\"type\": 1,\"version\":\""..Version.."\",\"deviceNo\":\""..DeviceHWSn.."\",\"token\":\""..token.."\"}"		
+	while true do		
+		local urlHost = "http://iot.gisunlink.com/api/device?clientID=%s"..misc.getImei().."&module_verion".._G.VERSION
+		http.request("POST",urlHost,nil,nil,bodyData,35000,
+	    function (respond,statusCode,head,body)
+			sys.publish("REG_IOT_SRV",respond,statusCode,body)
+		end)
+
+		local _,result,statusCode,body = sys.waitUntil("REG_IOT_SRV")
+
+		if result and statusCode == "200" then
+			--if server ~= nil and server.code == 20000 then
+			--	requestConut = 0
+			--	errorString = "noError"
+				break;
+			--end 
+		end
+		sys.wait(10000);
+	end
+end
+
 local function ConnectToSrv()
 	--阻塞式获取mqtt服务器信息
 	local mqtt_server = getMqttSrvInfo()
@@ -91,6 +119,8 @@ local function ConnectToSrv()
 	if mqttClient:connect(mqtt_server["mqtt_host"],mqtt_server["mqtt_port"],"tcp") then
 		retryConnectCnt = 0				
 		ready = true
+		sys.timerStop(RegistereDevice)
+		sys.timerStart(RegistereDevice,500)
 		--每次连接成功后给固件升级部分一个信号
 		firmware.system_start_signal()
 		sys.publish("GISUNLINK_NETMANAGER_CONNECTED_SER")
