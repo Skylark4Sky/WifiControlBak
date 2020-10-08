@@ -18,17 +18,18 @@ require "mqttOutMsg"
 function proc(mqttClient)
     local result,data
     while true do
-        result,data = mqttClient:receive(2000)
-		--uartTask.sendData(1,"aa")
+        result,data = mqttClient:receive(60000,"APP_SOCKET_SEND_DATA")
+		--接收到数据
         if result then
+			-- 插入数据处理队列
 			mqttMsg.insertQueue(data.topic,data.payload)
 			--log.error("mqttInMsg","payload:",data.payload)
             --如果mqttOutMsg中有等待发送的数据，则立即退出本循环
-            if mqttOutMsg.waitForSend() then return true end
+            --if mqttOutMsg.waitForSend() then return true end
         else
             break
         end
     end
 	
-    return result or data=="timeout"
+    return result or data=="timeout" or data=="APP_SOCKET_SEND_DATA"
 end
