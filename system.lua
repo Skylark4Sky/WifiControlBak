@@ -399,7 +399,7 @@ local function uartRecvMsg(packet)
 
 			local jsonString = json.encode(jsonTable)
 			if mqtt_ack == uartTask.MQTT_PUBLISH_NEEDACK then
-				mqttMsg.sendMsg("/power_run",jsonString,2,pid)
+				mqttMsg.sendMsg("/power_run",jsonString,0,pid)
 			else
 				mqttMsg.sendMsg("/power_run",jsonString,0)
 			end
